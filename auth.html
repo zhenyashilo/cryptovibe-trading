@@ -89,6 +89,16 @@
       font-size: 0.85rem;
       display: none;
     }
+    .success {
+      background: rgba(0, 255, 157, 0.15);
+      border: 1px solid rgba(0, 255, 157, 0.3);
+      color: #00ff9d;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      display: none;
+    }
     .tabs {
       display: flex;
       gap: 0.5rem;
@@ -119,6 +129,7 @@
       <p class="subtitle">Журнал трейдера с синхронизацией</p>
       
       <div class="error" id="error-msg"></div>
+      <div class="success" id="success-msg"></div>
       
       <div class="tabs">
         <div class="tab active" data-tab="login">Вход</div>
@@ -158,7 +169,9 @@
   <script>
     const SUPABASE_URL = 'https://htevorspryqgjttupldna.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_BaQCryXD7J060WJRm_qUDw_blk7892C';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    // ИСПРАВЛЕНО: используем другое имя переменной
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // Переключение табов
     document.querySelectorAll('.tab').forEach(tab => {
@@ -173,18 +186,19 @@
           document.getElementById('login-form').classList.add('hidden');
           document.getElementById('register-form').classList.remove('hidden');
         }
-        document.getElementById('error-msg').style.display = 'none';
+        hideMessages();
       });
     });
 
     // Вход
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      hideMessages();
       const email = document.getElementById('login-email').value;
       const password = document.getElementById('login-password').value;
       
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
         window.location.href = 'trading.html';
       } catch (err) {
@@ -195,14 +209,26 @@
     // Регистрация
     document.getElementById('register-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      hideMessages();
       const email = document.getElementById('register-email').value;
       const password = document.getElementById('register-password').value;
       
       try {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabaseClient.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            emailRedirectTo: window.location.origin + '/trading.html'
+          }
+        });
         if (error) throw error;
-        alert('Регистрация успешна! Теперь войдите.');
-        document.querySelector('[data-tab="login"]').click();
+        
+        if (data.user && !data.session) {
+          showSuccess('Регистрация успешна! Проверь email для подтверждения, затем войди.');
+        } else {
+          showSuccess('Регистрация успешна! Теперь войди.');
+          document.querySelector('[data-tab="login"]').click();
+        }
       } catch (err) {
         showError(err.message);
       }
@@ -220,11 +246,26 @@
       el.style.display = 'block';
     }
 
+    function showSuccess(msg) {
+      const el = document.getElementById('success-msg');
+      el.textContent = '✅ ' + msg;
+      el.style.display = 'block';
+    }
+
+    function hideMessages() {
+      document.getElementById('error-msg').style.display = 'none';
+      document.getElementById('success-msg').style.display = 'none';
+    }
+
     // Проверяем есть ли активная сессия
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        window.location.href = 'trading.html';
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+          window.location.href = 'trading.html';
+        }
+      } catch (e) {
+        console.log('Session check error:', e);
       }
     })();
   </script>
