@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CryptoVibe Trading">
+  <meta name="theme-color" content="#0a0a12">
+  <title>CryptoVibe Trading</title>
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAAbklEQVRYR+2XQQ6AIAwE6f9P9uLFq4mJhQKFnEwv1Mww0AJF8rZtSyIiMkMzM10BImIyM13dE5CZmZnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwK/A0A8F0E8QAAAABJRU5ErkJggg==">
+  <style>
+    :root {
+      --bg-primary: #0a0a12; --bg-secondary: #12121e; --bg-tertiary: #1a1a2e;
+      --bg-card: rgba(25, 25, 45, 0.6); --bg-input: rgba(255, 255, 255, 0.05);
+      --neon-cyan: #00f3ff; --neon-purple: #bc13fe; --neon-green: #00ff9d;
+      --neon-red: #ff0055; --neon-yellow: #ffe600; --neon-orange: #ff8c00;
+      --text-primary: #ffffff; --text-secondary: #a0a0b0;
+      --glass-border: 1px solid rgba(255, 255, 255, 0.08); --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; min-height: 100vh; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: var(--glass-border); flex-wrap: wrap; gap: 1rem; }
+    .header h1 { font-size: 1.75rem; font-weight: 700; }
+    .header h1 span { color: var(--neon-cyan); }
+    .nav-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .nav-links a { color: var(--text-secondary); text-decoration: none; padding: 0.5rem 1rem; border-radius: 8px; transition: all 0.2s; font-size: 0.9rem; }
+    .nav-links a:hover { color: var(--neon-cyan); background: rgba(0, 243, 255, 0.1); }
+    .nav-links a.active { color: var(--neon-cyan); background: rgba(0, 243, 255, 0.1); }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: var(--bg-card); border: var(--glass-border); border-radius: var(--radius); padding: 1.25rem; backdrop-filter: blur(12px); }
+    .stat-card h3 { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 0.5rem; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; }
+    .stat-value.positive { color: var(--neon-green); }
+    .stat-value.negative { color: var(--neon-red); }
+    .stat-value.neutral { color: var(--neon-cyan); }
+    .stat-value.warning { color: var(--neon-yellow); }
+    .section { margin-bottom: 2rem; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .section-header h2 { font-size: 1.25rem; font-weight: 600; }
+    .btn { background: var(--neon-cyan); color: #000; border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; }
+    .btn:hover { filter: brightness(1.1); }
+    .btn-secondary { background: var(--bg-input); color: var(--text-primary); border: var(--glass-border); }
+    .btn-danger { background: var(--neon-red); color: white; }
+    .trades-table { background: var(--bg-card); border: var(--glass-border); border-radius: var(--radius); overflow: hidden; }
+    .trade-row { display: grid; grid-template-columns: 110px 100px 1fr 100px 80px 100px 90px; gap: 1rem; padding: 1rem; border-bottom: var(--glass-border); align-items: center; }
+    .trade-row:last-child { border-bottom: none; }
+    .trade-row.header { background: rgba(0, 243, 255, 0.05); font-weight: 600; font-size: 0.8rem; color: var(--text-secondary); }
+    .trade-date { font-size: 0.8rem; color: var(--text-secondary); }
+    .trade-token { font-weight: 600; font-size: 0.95rem; }
+    .trade-pnl { font-weight: 700; text-align: right; font-size: 0.95rem; }
+    .trade-pnl.positive { color: var(--neon-green); }
+    .trade-pnl.negative { color: var(--neon-red); }
+    .trade-actions { display: flex; gap: 0.5rem; }
+    .trade-actions button { background: var(--bg-input); border: var(--glass-border); border-radius: 6px; padding: 0.4rem 0.6rem; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; font-size: 0.85rem; }
+    .trade-actions button:hover { color: var(--neon-cyan); border-color: var(--neon-cyan); }
+    .empty-state { text-align: center; padding: 3rem; color: var(--text-secondary); }
+    .period-filter { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .period-btn { background: var(--bg-input); border: var(--glass-border); color: var(--text-secondary); padding: 0.5rem 1rem; border-radius: 99px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .period-btn:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.15); }
+    .period-btn.active { background: rgba(0, 243, 255, 0.1); color: var(--neon-cyan); border-color: var(--neon-cyan); }
+    .tag { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-right: 0.3rem; margin-bottom: 0.2rem; }
+    .tag.tag-scalp { background: rgba(188, 19, 254, 0.15); color: var(--neon-purple); border: 1px solid rgba(188, 19, 254, 0.3); }
+    .tag.tag-swing { background: rgba(0, 255, 157, 0.15); color: var(--neon-green); border: 1px solid rgba(0, 255, 157, 0.3); }
+    .tag.tag-airdrop { background: rgba(255, 230, 0, 0.15); color: var(--neon-yellow); border: 1px solid rgba(255, 230, 0, 0.3); }
+    .tag.tag-signal { background: rgba(255, 140, 0, 0.15); color: var(--neon-orange); border: 1px solid rgba(255, 140, 0, 0.3); }
+    .tag.tag-custom { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); border: 1px solid rgba(255, 255, 255, 0.2); }
+    .tag-filter { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; padding: 1rem; background: var(--bg-card); border: var(--glass-border); border-radius: var(--radius); align-items: center; }
+    .tag-filter-btn { background: var(--bg-input); border: var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+    .tag-filter-btn:hover { color: var(--text-primary); }
+    .tag-filter-btn.active { background: rgba(0, 243, 255, 0.15); color: var(--neon-cyan); border-color: var(--neon-cyan); }
+    .tag-input-container { position: relative; }
+    .tag-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-secondary); border: var(--glass-border); border-radius: 8px; max-height: 150px; overflow-y: auto; z-index: 100; display: none; margin-top: 4px; }
+    .tag-suggestion-item { padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.85rem; border-bottom: var(--glass-border); }
+    .tag-suggestion-item:hover { background: rgba(0, 243, 255, 0.1); color: var(--neon-cyan); }
+    .tag-suggestion-item:last-child { border-bottom: none; }
+    .selected-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
+    .selected-tag { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; background: rgba(0, 243, 255, 0.15); color: var(--neon-cyan); border: 1px solid rgba(0, 243, 255, 0.3); }
+    .selected-tag .remove-tag { cursor: pointer; font-size: 0.9rem; opacity: 0.7; }
+    .selected-tag .remove-tag:hover { opacity: 1; }
+    .plan-card { background: var(--bg-card); border: var(--glass-border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+    .plan-card.plan-pending { border-left: 4px solid var(--neon-yellow); }
+    .plan-card.plan-completed { border-left: 4px solid var(--neon-green); }
+    .plan-card.plan-cancelled { border-left: 4px solid var(--text-secondary); opacity: 0.6; }
+    .plan-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .plan-title { font-size: 1.1rem; font-weight: 600; }
+    .plan-status { padding: 0.3rem 0.8rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+    .plan-status.pending { background: rgba(255, 230, 0, 0.15); color: var(--neon-yellow); }
+    .plan-status.completed { background: rgba(0, 255, 157, 0.15); color: var(--neon-green); }
+    .plan-status.cancelled { background: rgba(160, 160, 176, 0.15); color: var(--text-secondary); }
+    .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+    .plan-item { background: var(--bg-input); border-radius: 8px; padding: 0.75rem; }
+    .plan-item-label { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+    .plan-item-value { font-size: 1rem; font-weight: 600; }
+    .plan-item-value.positive { color: var(--neon-green); }
+    .plan-item-value.negative { color: var(--neon-red); }
+    .plan-item-value.neutral { color: var(--neon-cyan); }
+    .plan-item-value.warning { color: var(--neon-yellow); }
+    .plan-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: var(--glass-border); }
+    .plan-comparison-col h4 { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+    .plan-followed { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+    .plan-followed-btn { padding: 0.5rem 1rem; border-radius: 6px; border: var(--glass-border); background: var(--bg-input); color: var(--text-secondary); cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
+    .plan-followed-btn:hover { border-color: rgba(255,255,255,0.15); color: var(--text-primary); }
+    .plan-followed-btn.active-yes { background: rgba(0, 255, 157, 0.15); color: var(--neon-green); border-color: var(--neon-green); }
+    .plan-followed-btn.active-no { background: rgba(255, 0, 85, 0.15); color: var(--neon-red); border-color: var(--neon-red); }
+    .plan-followed-btn.active-partial { background: rgba(255, 230, 0, 0.15); color: var(--neon-yellow); border-color: var(--neon-yellow); }
+    .checklist-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; font-size: 0.9rem; }
+    .checklist-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+    .diary-card { background: var(--bg-card); border: var(--glass-border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1rem; }
+    .diary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .diary-date { font-size: 1.1rem; font-weight: 600; }
+    .emotion-meter { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+    .emotion-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--glass-border); background: var(--bg-input); cursor: pointer; font-size: 1.5rem; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+    .emotion-btn:hover { transform: scale(1.1); border-color: rgba(255,255,255,0.2); }
+    .emotion-btn.active { border-color: var(--neon-cyan); background: rgba(0, 243, 255, 0.15); }
+    .diary-section { margin-bottom: 1rem; }
+    .diary-section h4 { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 500; }
+    .diary-section textarea { width: 100%; background: var(--bg-input); border: var(--glass-border); border-radius: 8px; padding: 0.75rem; color: var(--text-primary); font-size: 0.95rem; outline: none; resize: vertical; min-height: 80px; font-family: inherit; }
+    .diary-section textarea:focus { border-color: var(--neon-cyan); }
+    .diary-trades-list { background: var(--bg-input); border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; }
+    .diary-trade-item { padding: 0.5rem 0; border-bottom: 1px solid var(--glass-border); font-size: 0.85rem; display: flex; justify-content: space-between; }
+    .diary-trade-item:last-child { border-bottom: none; }
+    .diary-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .calc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+    .calc-card { background: var(--bg-card); border: var(--glass-border); border-radius: var(--radius); padding: 1.5rem; }
+    .calc-card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .calc-card .calc-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; }
+    .calc-field { margin-bottom: 1rem; }
+    .calc-field label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 500; }
+    .calc-field input { width: 100%; background: var(--bg-input); border: var(--glass-border); border-radius: 8px; padding: 0.75rem; color: var(--text-primary); font-size: 1rem; outline: none; }
+    .calc-field input:focus { border-color: var(--neon-cyan); }
+    .calc-result { background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.2); border-radius: 8px; padding: 1rem; margin-top: 1rem; }
+    .calc-result-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--glass-border); }
+    .calc-result-row:last-child { border-bottom: none; }
+    .calc-result-label { font-size: 0.85rem; color: var(--text-secondary); }
+    .calc-result-value { font-size: 1.1rem; font-weight: 700; color: var(--neon-cyan); }
+    .calc-result-value.positive { color: var(--neon-green); }
+    .calc-result-value.negative { color: var(--neon-red); }
+    .calc-result-value.warning { color: var(--neon-yellow); }
+    dialog { background: var(--bg-secondary); border: var(--glass-border); border-radius: var(--radius); color: var(--text-primary); padding: 0; width: 90%; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); max-height: 90vh; overflow-y: auto; margin: 0; }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); }
+    dialog[open] { animation: modalIn 0.25s ease-out; }
+    @keyframes modalIn { from { opacity: 0; transform: translate(-50%, -40%) scale(0.98); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+    .modal-header { padding: 1.25rem; border-bottom: var(--glass-border); display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h2 { font-size: 1.25rem; }
+    .close-btn { background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; }
+    .close-btn:hover { color: var(--text-primary); }
+    .modal-body { padding: 1.25rem; display: grid; gap: 1rem; }
+    .form-group { display: grid; gap: 0.4rem; }
+    .form-group label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; }
+    .form-input { background: var(--bg-input); border: var(--glass-border); border-radius: 8px; padding: 0.75rem; color: var(--text-primary); font-size: 1rem; outline: none; width: 100%; }
+    .form-input:focus { border-color: var(--neon-cyan); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-secondary); border: var(--glass-border); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 100; display: none; margin-top: 4px; }
+    .autocomplete-item { padding: 0.75rem; cursor: pointer; font-size: 0.95rem; border-bottom: var(--glass-border); }
+    .autocomplete-item:hover { background: rgba(0, 243, 255, 0.15); color: var(--neon-cyan); }
+    .autocomplete-item:last-child { border-bottom: none; }
+
+    /* ===== УВЕДОМЛЕНИЯ ===== */
+    .notif-section { background: var(--bg-card); border: var(--glass-border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1rem; }
+    .notif-section h3 { font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+    .notif-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--glass-border); }
+    .notif-row:last-child { border-bottom: none; }
+    .notif-row label { font-size: 0.9rem; color: var(--text-primary); }
+    .notif-row input { width: 100px; background: var(--bg-input); border: var(--glass-border); border-radius: 6px; padding: 0.5rem; color: var(--text-primary); font-size: 0.9rem; text-align: right; }
+    .toggle-container { display: flex; align-items: center; gap: 0.75rem; }
+    .toggle { position: relative; width: 48px; height: 26px; background: var(--bg-tertiary); border-radius: 13px; cursor: pointer; transition: background 0.3s; border: none; padding: 0; }
+    .toggle.active { background: var(--neon-green); }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.3s; }
+    .toggle.active::after { transform: translateX(22px); }
+    .notif-status { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; }
+    .notif-status.enabled { background: rgba(0, 255, 157, 0.15); color: var(--neon-green); }
+    .notif-status.disabled { background: rgba(255, 0, 85, 0.15); color: var(--neon-red); }
+
+    @media (max-width: 768px) {
+      .container { padding: 1rem; }
+      .trade-row { grid-template-columns: 1fr; gap: 0.5rem; padding: 0.75rem; }
+      .trade-row.header { display: none; }
+      .form-row { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .calc-grid { grid-template-columns: 1fr; }
+      .plan-comparison { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Crypto<span>Vibe</span> Trading</h1>
+      <nav class="nav-links">
+        <a href="index.html">← Портфель</a>
+        <a href="#journal" class="active">Журнал</a>
+        <a href="#plans">Планы</a>
+        <a href="#diary">Дневник</a>
+        <a href="#stats">Статистика</a>
+        <a href="#calculators">Калькуляторы</a>
+        <a href="#settings">Настройки</a>
+      </nav>
+    </header>
+    <main id="main-content"></main>
+  </div>
+
+  <dialog id="trade-modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Новая сделка</h2>
+      <button class="close-btn" id="close-modal">&times;</button>
+    </div>
+    <form id="trade-form" class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Дата</label>
+          <input type="date" id="trade-date" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label>Время</label>
+          <input type="time" id="trade-time" class="form-input" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Токен</label>
+        <input type="text" id="trade-token" class="form-input" placeholder="Напр: VOLT, LOOT..." required autocomplete="off">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Цена входа ($)</label>
+          <input type="number" id="trade-entry" class="form-input" step="any" required>
+        </div>
+        <div class="form-group">
+          <label>Цена выхода / TP ($)</label>
+          <input type="number" id="trade-exit" class="form-input" step="any" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Stop Loss ($) <span style="color: var(--neon-red);">* обязательно для планов</span></label>
+        <input type="number" id="trade-sl" class="form-input" step="any" placeholder="Напр: 0.00009">
+      </div>
+      <div class="form-group">
+        <label>Количество токенов</label>
+        <input type="number" id="trade-quantity" class="form-input" step="any" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Комиссия ($)</label>
+          <input type="number" id="trade-fee" class="form-input" step="any" value="0">
+        </div>
+        <div class="form-group">
+          <label>Риск на сделку (%)</label>
+          <input type="number" id="trade-risk" class="form-input" step="any" value="2">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Теги</label>
+        <div class="tag-input-container">
+          <input type="text" id="trade-tags-input" class="form-input" placeholder="Начни вводить..." autocomplete="off">
+          <div class="tag-suggestions" id="tag-suggestions"></div>
+        </div>
+        <div class="selected-tags" id="selected-tags"></div>
+      </div>
+      <div class="form-group">
+        <label>Заметки / Причина входа</label>
+        <textarea id="trade-notes" class="form-input" rows="3" placeholder="Стратегия, эмоции, контекст..."></textarea>
+      </div>
+      <button type="submit" class="btn">Сохранить</button>
+    </form>
+  </dialog>
+
+    <script src="js/db.js"></script>
+  <script src="js/tokens-registry.js"></script>
+  <script src="js/ston-api.js"></script>
+  <script src="js/proxy.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/trading-db.js"></script>
+  <script src="js/trading-stats.js"></script>
+  <script src="js/trading-app.js"></script>
+</body>
+</html>

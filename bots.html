@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CryptoVibe - Боты для заработка">
+  <meta name="theme-color" content="#0a0a12">
+  <title>Боты для заработка | CryptoVibe</title>
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAAbklEQVRYR+2XQQ6AIAwE6f9P9uLFq4mJhQKFnEwv1Mww0AJF8rZtSyIiMkMzM10BImIyM13dE5CZmZnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwK/A0A8F0E8QAAAABJRU5ErkJggg==">
+  
+  <style>
+    :root {
+      --bg-primary: #0a0a12;
+      --bg-secondary: #12121e;
+      --bg-tertiary: #1a1a2e;
+      --bg-card: rgba(25, 25, 45, 0.6);
+      --bg-input: rgba(255, 255, 255, 0.05);
+      --neon-cyan: #00f3ff;
+      --neon-purple: #bc13fe;
+      --neon-green: #00ff9d;
+      --neon-red: #ff0055;
+      --neon-yellow: #ffe600;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0b0;
+      --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+      --radius: 16px;
+      --sidebar-width: 240px;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    
+    .app-layout { display: flex; min-height: 100vh; }
+    
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--bg-secondary);
+      border-right: var(--glass-border);
+      padding: 1.5rem 1rem;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      z-index: 40;
+    }
+    
+    .sidebar-logo {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+      padding: 0 0.5rem;
+    }
+    
+    .sidebar-logo span { color: var(--neon-green); }
+    
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      flex: 1;
+    }
+    
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+      background: none;
+      text-align: left;
+      width: 100%;
+    }
+    
+    .sidebar-link:hover {
+      background: rgba(255,255,255,0.04);
+      color: var(--text-primary);
+    }
+    
+    .sidebar-link.active {
+      background: rgba(0, 255, 157, 0.1);
+      color: var(--neon-green);
+    }
+    
+    .sidebar-link svg { width: 20px; height: 20px; }
+    
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 1rem;
+      border-top: var(--glass-border);
+    }
+    
+    .sidebar-footer button {
+      width: 100%;
+      padding: 0.6rem;
+      background: var(--bg-input);
+      border: var(--glass-border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .sidebar-footer button:hover {
+      color: var(--neon-green);
+      border-color: var(--neon-green);
+    }
+    
+    .main-content {
+      flex: 1;
+      margin-left: var(--sidebar-width);
+      padding: 2rem;
+      max-width: 1200px;
+    }
+    
+    .bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(18, 18, 30, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: var(--glass-border);
+      padding: 0.5rem 0.25rem;
+      z-index: 40;
+      justify-content: space-around;
+    }
+    
+    .bottom-nav-link {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.7rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+    
+    .bottom-nav-link svg { width: 22px; height: 22px; }
+    .bottom-nav-link.active { color: var(--neon-green); }
+    
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .main-content { margin-left: 0; padding: 1rem; padding-bottom: 80px; }
+      .bottom-nav { display: flex; }
+    }
+    
+    .page-header { margin-bottom: 1.5rem; }
+    .page-header h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .page-header p { color: var(--text-secondary); font-size: 0.95rem; }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .stat-card {
+      background: var(--bg-card);
+      border: var(--glass-border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      backdrop-filter: blur(12px);
+    }
+    
+    .stat-card h3 {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    
+    .metric-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+    }
+    
+    .metric-value.positive { color: var(--neon-green); }
+    .metric-value.negative { color: var(--neon-red); }
+    
+    .section { margin-bottom: 2rem; }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .section-header h2 { font-size: 1.25rem; font-weight: 600; }
+    
+    .token-list { display: grid; gap: 0.75rem; }
+    
+    .token-item {
+      background: var(--bg-card);
+      border: var(--glass-border);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      color: inherit;
+    }
+    
+    .token-item:hover {
+      border-color: rgba(0, 255, 157, 0.3);
+      transform: translateX(4px);
+    }
+    
+    .token-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex: 1;
+    }
+    
+    .token-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--neon-green), var(--neon-cyan));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    
+    .token-name { font-weight: 600; font-size: 1rem; }
+    .token-sub { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; }
+    
+    .token-quantity {
+      font-size: 0.75rem;
+      color: var(--neon-cyan);
+      background: rgba(0, 243, 255, 0.08);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 0.25rem;
+    }
+    
+    .token-stats { text-align: right; flex-shrink: 0; }
+    .token-value { font-weight: 700; font-size: 1rem; }
+    .token-profit { font-size: 0.8rem; margin-top: 0.15rem; }
+    .token-profit.pos { color: var(--neon-green); }
+    .token-profit.neg { color: var(--neon-red); }
+    
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      padding: 0.5rem 0;
+      transition: color 0.2s;
+    }
+    
+    .back-btn:hover { color: var(--neon-green); }
+    
+    .token-detail-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .token-detail-header .token-icon {
+      width: 56px;
+      height: 56px;
+      font-size: 1.1rem;
+    }
+    
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .detail-card {
+      background: var(--bg-card);
+      border: var(--glass-border);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    
+    .detail-card label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+    
+    .detail-card .value { font-size: 1.25rem; font-weight: 700; }
+    
+    .tx-list { display: grid; gap: 0.75rem; }
+    
+    .tx-item {
+      background: var(--bg-card);
+      border: var(--glass-border);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .tx-info { flex: 1; min-width: 0; }
+    .tx-info h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.2rem; }
+    .tx-meta { font-size: 0.8rem; color: var(--text-secondary); }
+    
+    .tx-amount {
+      text-align: right;
+      font-weight: 600;
+      min-width: 100px;
+      flex-shrink: 0;
+    }
+    
+    .tx-amount.pos { color: var(--neon-green); }
+    .tx-amount.neg { color: var(--neon-red); }
+    
+    .tx-badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-right: 0.5rem;
+    }
+    
+    .badge-earning-invest { background: rgba(0, 255, 157, 0.2); color: var(--neon-green); }
+    .badge-earning-payout { background: rgba(0, 243, 255, 0.2); color: var(--neon-cyan); }
+    
+    .tx-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    
+    .tx-action-btn {
+      background: var(--bg-input);
+      border: var(--glass-border);
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    
+    .tx-action-btn:hover {
+      color: var(--neon-green);
+      border-color: var(--neon-green);
+    }
+    
+    .tx-action-btn.delete:hover {
+      color: var(--neon-red);
+      border-color: var(--neon-red);
+    }
+    
+    .fab-container {
+      position: fixed;
+      bottom: 5rem;
+      right: 1.5rem;
+      z-index: 30;
+    }
+    
+    @media (min-width: 769px) {
+      .fab-container { bottom: 2rem; }
+    }
+    
+    .fab-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, var(--neon-green), var(--neon-cyan));
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(0, 255, 157, 0.4);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    
+    .fab-btn:active { transform: scale(0.92); }
+    .fab-btn:hover { box-shadow: 0 6px 28px rgba(0, 255, 157, 0.5); }
+    
+    dialog {
+      background: var(--bg-secondary);
+      border: var(--glass-border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      padding: 0;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-height: 90vh;
+      overflow-y: auto;
+      margin: 0;
+    }
+    
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+    }
+    
+    dialog[open] { animation: modalIn 0.25s ease-out; }
+    
+    @keyframes modalIn {
+      from { opacity: 0; transform: translate(-50%, -40%) scale(0.98); }
+      to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    
+    .modal-header {
+      padding: 1.25rem;
+      border-bottom: var(--glass-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .modal-header h2 { font-size: 1.25rem; }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.25rem;
+    }
+    
+    .close-btn:hover { color: var(--text-primary); }
+    
+    .modal-body {
+      padding: 1.25rem;
+      display: grid;
+      gap: 1rem;
+    }
+    
+    .form-group { display: grid; gap: 0.4rem; }
+    
+    .form-group label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    
+    .form-input {
+      background: var(--bg-input);
+      border: var(--glass-border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      color: var(--text-primary);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    
+    .form-input:focus {
+      border-color: var(--neon-green);
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    
+    .custom-select { position: relative; }
+    
+    .custom-select-trigger {
+      background: var(--bg-input);
+      border: var(--glass-border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      color: var(--text-primary);
+      font-size: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      user-select: none;
+    }
+    
+    .custom-select-trigger:hover { border-color: rgba(255,255,255,0.15); }
+    .custom-select-trigger[aria-expanded="true"] { border-color: var(--neon-green); }
+    
+    .custom-select-trigger .arrow {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.2s;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a0a0b0' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+    
+    .custom-select-trigger[aria-expanded="true"] .arrow {
+      transform: rotate(180deg);
+    }
+    
+    .custom-select-list {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      border: var(--glass-border);
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      display: none;
+    }
+    
+    .custom-select-list.open {
+      display: block;
+      animation: dropdownIn 0.15s ease-out;
+    }
+    
+    @keyframes dropdownIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .custom-select-option {
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      font-size: 0.95rem;
+    }
+    
+    .custom-select-option:hover,
+    .custom-select-option.highlighted {
+      background: rgba(0, 255, 157, 0.1);
+      color: var(--neon-green);
+    }
+    
+    .custom-select-option.selected {
+      background: rgba(0, 255, 157, 0.15);
+      color: var(--neon-green);
+    }
+    
+    .form-hint {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+      opacity: 0.8;
+    }
+    
+    .submit-btn {
+      background: var(--neon-green);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 0.85rem;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: transform 0.15s, filter 0.15s;
+      margin-top: 0.5rem;
+    }
+    
+    .submit-btn:hover { filter: brightness(1.1); }
+    .submit-btn:active { transform: scale(0.98); }
+    
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-secondary);
+    }
+    
+    @media (max-width: 480px) {
+      .form-row { grid-template-columns: 1fr; }
+      .metric-value { font-size: 1.5rem; }
+      .page-header h1 { font-size: 1.5rem; }
+      .tx-item { flex-wrap: wrap; }
+      .tx-actions { width: 100%; justify-content: flex-end; margin-top: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">💰 Боты <span>Vibe</span></div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="sidebar-link">🏠 Главная (Токены)</a>
+        <a href="#/bots" class="sidebar-link active" data-route="bots">📊 Все боты</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="export-btn">📦 Экспорт данных</button>
+      </div>
+    </aside>
+
+    <main id="main-content" class="main-content"></main>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="index.html" class="bottom-nav-link">🏠</a>
+    <a href="#/bots" class="bottom-nav-link active" data-route="bots">📊</a>
+  </nav>
+
+  <div class="fab-container">
+    <button class="fab-btn" id="open-modal-btn" aria-label="Добавить операцию">➕</button>
+  </div>
+
+  <dialog id="tx-modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Новая операция</h2>
+      <button class="close-btn" id="close-modal-btn">&times;</button>
+    </div>
+    <form id="tx-form" class="modal-body">
+      <div class="form-group">
+        <label>Тип операции</label>
+        <div class="custom-select" data-select="type">
+          <div class="custom-select-trigger">
+            <span class="selected-text">Пополнение бота</span>
+            <span class="arrow"></span>
+          </div>
+          <div class="custom-select-list">
+            <div class="custom-select-option selected" data-value="earning_invest">
+              <span>Пополнение бота для заработка</span>
+            </div>
+            <div class="custom-select-option" data-value="earning_payout">
+              <span>Выплата из бота для заработка</span>
+            </div>
+          </div>
+          <input type="hidden" name="type" value="earning_invest">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Название бота</label>
+        <input type="text" id="tx-name" name="name" class="form-input" placeholder="Напр: FaithTON" autocomplete="off">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Сумма</label>
+          <input type="number" id="tx-amount" name="amount" class="form-input" step="any" placeholder="10.00">
+          <span class="form-hint" id="hint-amount">Сколько пополнили</span>
+        </div>
+        <div class="form-group">
+          <label>Валюта</label>
+          <div class="custom-select" data-select="currency">
+            <div class="custom-select-trigger">
+              <span class="selected-text">USDT</span>
+              <span class="arrow"></span>
+            </div>
+            <div class="custom-select-list">
+              <div class="custom-select-option selected" data-value="USDT">USDT</div>
+              <div class="custom-select-option" data-value="GRAM">GRAM</div>
+            </div>
+            <input type="hidden" name="currency" value="USDT">
+          </div>
+          <span class="form-hint">Только USDT или GRAM</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Дата</label>
+        <input type="date" id="tx-date" name="date" class="form-input">
+      </div>
+
+      <div class="form-group">
+        <label>Заметки (необязательно)</label>
+        <input type="text" id="tx-notes" name="notes" class="form-input" placeholder="Комментарии...">
+      </div>
+
+      <button type="submit" class="submit-btn">Сохранить операцию</button>
+    </form>
+  </dialog>
+
+  <script src="js/db.js"></script>
+  <script src="js/bots-router.js"></script>
+  <script src="js/bots-app.js"></script>
+</body>
+</html>

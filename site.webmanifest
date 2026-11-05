@@ -1,0 +1,17 @@
+{
+  "name": "CryptoVibe Analytics",
+  "short_name": "CryptoVibe",
+  "description": "Учет крипто-портфеля с отслеживанием курсов STON.fi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a12",
+  "theme_color": "#0a0a12",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%230a0a12'/%3E%3Ctext x='96' y='130' font-size='100' font-family='Arial' font-weight='bold' text-anchor='middle' fill='%2300f3ff'%3ECV%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
