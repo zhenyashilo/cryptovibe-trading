@@ -21,6 +21,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   ];
 
   try {
+    // Проверяем авторизацию
+    const isGuest = localStorage.getItem('guest_mode') === 'true';
+    
+    if (typeof SupabaseClient !== 'undefined') {
+      await SupabaseClient.init();
+      
+      // Если не авторизован и не гость - редирект на auth.html
+      if (!SupabaseClient.isAuthenticated() && !isGuest) {
+        window.location.href = 'auth.html';
+        return;
+      }
+    }
+    
     await TradingDB.init();
     trades = await TradingDB.getAll();
     plans = await TradingDB.getAllPlans();
@@ -137,6 +150,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (t.classList.contains('emotion-btn')) {
       document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('active'));
       t.classList.add('active');
+      return;
+    }
+    if (t.id === 'logout-btn') {
+      if (typeof SupabaseClient !== 'undefined' && SupabaseClient.isAuthenticated()) {
+        await SupabaseClient.signOut();
+        localStorage.removeItem('guest_mode');
+        window.location.href = 'auth.html';
+      } else {
+        localStorage.removeItem('guest_mode');
+        window.location.href = 'auth.html';
+      }
       return;
     }
   });
@@ -682,8 +706,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const m = document.getElementById('main-content');
     const ns = typeof Notifications !== 'undefined' ? Notifications.tradingSettings : {};
     const notifEnabled = typeof Notifications !== 'undefined' && Notification.permission === 'granted';
+    const isAuth = typeof SupabaseClient !== 'undefined' && SupabaseClient.isAuthenticated();
+    const userEmail = isAuth ? SupabaseClient.getCurrentUser()?.email : (localStorage.getItem('guest_mode') === 'true' ? 'Гость' : 'Не авторизован');
     
     m.innerHTML = `<section class="section"><div class="section-header"><h2>⚙️ Настройки</h2></div>
+      
+      <div class="notif-section">
+        <h3>👤 Аккаунт</h3>
+        <div style="margin-bottom: 1rem;">
+          <span style="color: var(--text-secondary); font-size: 0.9rem;">Email: </span>
+          <span class="notif-status ${isAuth ? 'enabled' : 'disabled'}">${userEmail}</span>
+        </div>
+        <button class="btn btn-secondary" id="logout-btn" style="margin-bottom: 1rem;">🚪 Выйти</button>
+      </div>
+      
       <div class="notif-section">
         <h3>🔔 Уведомления и алерты</h3>
         <div style="margin-bottom: 1rem;">
