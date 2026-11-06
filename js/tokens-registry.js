@@ -1,68 +1,82 @@
 // Модуль управления токенами STON.fi
-// Хранит список токенов с адресами контрактов в IndexedDB
+// Теперь синхронизируется через Firebase!
 
 const TokensRegistry = {
-  STORE_NAME: 'stonTokens',
+  useFirebase: false,
 
-  async _getStore() {
-    const db = await dbPromise;
-    if (!db.objectStoreNames.contains(this.STORE_NAME)) {
-      console.warn('Store stonTokens не создан. Обновите DB_VERSION.');
-      return null;
+  async init() {
+    // Проверяем, доступен ли Firebase и авторизован ли пользователь
+    if (typeof FirebaseClient !== 'undefined') {
+      await FirebaseClient.init();
+      if (FirebaseClient.isAuthenticated()) {
+        this.useFirebase = true;
+        console.log('TokensRegistry: Using Firebase');
+        return;
+      }
     }
-    return db;
+    this.useFirebase = false;
+    console.log('TokensRegistry: Using localStorage (guest mode)');
   },
 
   async getAll() {
-    const db = await this._getStore();
-    if (!db) return [];
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.STORE_NAME, 'readonly');
-      const store = tx.objectStore(this.STORE_NAME);
-      const req = store.getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
-    });
+    if (this.useFirebase) {
+      const snapshot = await firebase.firestore().collection('ston_tokens')
+        .where('userId', '==', FirebaseClient.currentUser.uid)
+        .get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } else {
+      const data = localStorage.getItem('ston_tokens');
+      return data ? JSON.parse(data) : [];
+    }
   },
 
   async add(token) {
-    const db = await this._getStore();
-    if (!db) throw new Error('DB не готова');
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.STORE_NAME, 'readwrite');
-      const store = tx.objectStore(this.STORE_NAME);
-      const req = store.add({
+    if (this.useFirebase) {
+      const docRef = await firebase.firestore().collection('ston_tokens').add({
         ...token,
-        id: token.id || crypto.randomUUID(),
-        createdAt: Date.now()
+        userId: FirebaseClient.currentUser.uid,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+      return { id: docRef.id, ...token };
+    } else {
+      const tokens = await this.getAll();
+      const newToken = { 
+        ...token, 
+        id: token.id || crypto.randomUUID(), 
+        createdAt: Date.now() 
+      };
+      tokens.push(newToken);
+      localStorage.setItem('ston_tokens', JSON.stringify(tokens));
+      return newToken;
+    }
   },
 
   async update(token) {
-    const db = await this._getStore();
-    if (!db) throw new Error('DB не готова');
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.STORE_NAME, 'readwrite');
-      const store = tx.objectStore(this.STORE_NAME);
-      const req = store.put(token);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+    if (this.useFirebase) {
+      await firebase.firestore().collection('ston_tokens').doc(token.id).update({
+        ...token,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      return token;
+    } else {
+      const tokens = await this.getAll();
+      const idx = tokens.findIndex(t => t.id === token.id);
+      if (idx !== -1) {
+        tokens[idx] = token;
+        localStorage.setItem('ston_tokens', JSON.stringify(tokens));
+      }
+      return token;
+    }
   },
 
   async delete(id) {
-    const db = await this._getStore();
-    if (!db) throw new Error('DB не готова');
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.STORE_NAME, 'readwrite');
-      const store = tx.objectStore(this.STORE_NAME);
-      const req = store.delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
+    if (this.useFirebase) {
+      await firebase.firestore().collection('ston_tokens').doc(id).delete();
+    } else {
+      const tokens = await this.getAll();
+      const filtered = tokens.filter(t => t.id !== id);
+      localStorage.setItem('ston_tokens', JSON.stringify(filtered));
+    }
   },
 
   async getByAddress(address) {
