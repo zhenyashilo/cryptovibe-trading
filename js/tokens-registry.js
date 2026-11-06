@@ -1,12 +1,10 @@
 // Модуль управления токенами STON.fi
-// Теперь НАДЁЖНО синхронизируется через Firebase!
+// Синхронизация через Firebase!
 
 const TokensRegistry = {
   
-  // Надёжная проверка авторизации с ожиданием инициализации
   async _isAuthenticated() {
     if (typeof FirebaseClient !== 'undefined') {
-      // Если пользователь еще не проверен, ждем инициализации
       if (FirebaseClient.currentUser === null && typeof FirebaseClient.init === 'function') {
         await FirebaseClient.init();
       }
@@ -81,11 +79,9 @@ const TokensRegistry = {
     return all.find(t => t.address.toLowerCase() === address.toLowerCase());
   },
 
-  // Валидация адреса TON
   isValidAddress(address) {
     if (!address) return false;
     const trimmed = address.trim();
-    // Формат: EQ... или UQ... , 48 символов base64url
     return /^(EQ|UQ)[A-Za-z0-9_-]{46}$/.test(trimmed);
   }
 };
