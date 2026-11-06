@@ -6,7 +6,7 @@
   <meta name="description" content="CryptoVibe Trading">
   <meta name="theme-color" content="#0a0a12">
   <title>CryptoVibe Trading</title>
-  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAAbklEQVRYR+2XQQ6AIAwE6f9P9uLFq4mJhQKFnEwv1Mww0AJF8rZtSyIiMkMzM10BImIyM13dE5CZmZnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwK/A0A8F0E8QAAAABJRU5ErkJggg==">
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAAbklEQVRYR+2XQQ6AIAwE6f9P9uLFq4mJhQKFnEwv1Mww0AJF8rZtSyIiMkMzM10BImIyM13dE5CZmZnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwKmJnZzOwK/A0A8F0E8QAAAABJRU5ErkJggg==">
   <style>
     :root {
       --bg-primary: #0a0a12; --bg-secondary: #12121e; --bg-tertiary: #1a1a2e;
@@ -263,8 +263,13 @@
     </form>
   </dialog>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase-client.js"></script>
+  <!-- Firebase SDK (ЗАМЕНА SUPABASE) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-client.js"></script>
+  
+  <!-- Остальные скрипты приложения -->
   <script src="js/db.js"></script>
   <script src="js/tokens-registry.js"></script>
   <script src="js/ston-api.js"></script>
