@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CryptoVibe - Вход</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -16,11 +18,7 @@
       align-items: center;
       justify-content: center;
     }
-    .container {
-      max-width: 400px;
-      width: 100%;
-      padding: 2rem;
-    }
+    .container { max-width: 400px; width: 100%; padding: 2rem; }
     .card {
       background: rgba(25, 25, 45, 0.6);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -28,26 +26,11 @@
       padding: 2rem;
       backdrop-filter: blur(12px);
     }
-    h1 {
-      text-align: center;
-      margin-bottom: 0.5rem;
-      font-size: 1.75rem;
-    }
+    h1 { text-align: center; margin-bottom: 0.5rem; font-size: 1.75rem; }
     h1 span { color: #00f3ff; }
-    .subtitle {
-      text-align: center;
-      color: #a0a0b0;
-      margin-bottom: 2rem;
-      font-size: 0.9rem;
-    }
+    .subtitle { text-align: center; color: #a0a0b0; margin-bottom: 2rem; font-size: 0.9rem; }
     .form-group { margin-bottom: 1.25rem; }
-    label {
-      display: block;
-      font-size: 0.85rem;
-      color: #a0a0b0;
-      margin-bottom: 0.4rem;
-      font-weight: 500;
-    }
+    label { display: block; font-size: 0.85rem; color: #a0a0b0; margin-bottom: 0.4rem; font-weight: 500; }
     input {
       width: 100%;
       background: rgba(255, 255, 255, 0.05);
@@ -99,11 +82,7 @@
       font-size: 0.85rem;
       display: none;
     }
-    .tabs {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
     .tab {
       flex: 1;
       background: rgba(255, 255, 255, 0.05);
@@ -127,16 +106,12 @@
     <div class="card">
       <h1>Crypto<span>Vibe</span></h1>
       <p class="subtitle">Журнал трейдера с синхронизацией</p>
-      
       <div class="error" id="error-msg"></div>
       <div class="success" id="success-msg"></div>
-      
       <div class="tabs">
         <div class="tab active" data-tab="login">Вход</div>
         <div class="tab" data-tab="register">Регистрация</div>
       </div>
-      
-      <!-- Форма входа -->
       <form id="login-form">
         <div class="form-group">
           <label>Email</label>
@@ -148,8 +123,6 @@
         </div>
         <button type="submit" class="btn">Войти</button>
       </form>
-      
-      <!-- Форма регистрации -->
       <form id="register-form" class="hidden">
         <div class="form-group">
           <label>Email</label>
@@ -161,24 +134,28 @@
         </div>
         <button type="submit" class="btn">Зарегистрироваться</button>
       </form>
-      
       <button class="btn btn-secondary" id="continue-guest">Продолжить без регистрации (локально)</button>
     </div>
   </div>
 
   <script>
-    const SUPABASE_URL = 'https://htevorspryqgjttupldna.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_BaQCryXD7J060WJRm_qUDw_blk7892C';
-    
-    // ИСПРАВЛЕНО: используем другое имя переменной
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const firebaseConfig = {
+      apiKey: "AIzaSyBYP0lCrTJzeh_7ERYdqGVWaFpkkOiff24",
+      authDomain: "cryptovibe-trading.firebaseapp.com",
+      projectId: "cryptovibe-trading",
+      storageBucket: "cryptovibe-trading.firebasestorage.app",
+      messagingSenderId: "415915114461",
+      appId: "1:415915114461:web:a327dae9ee8da240bb8034",
+      measurementId: "G-CSS9SGCJ2V"
+    };
 
-    // Переключение табов
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        
         if (tab.dataset.tab === 'login') {
           document.getElementById('login-form').classList.remove('hidden');
           document.getElementById('register-form').classList.add('hidden');
@@ -190,51 +167,35 @@
       });
     });
 
-    // Вход
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       hideMessages();
-      const email = document.getElementById('login-email').value;
-      const password = document.getElementById('login-password').value;
-      
       try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        await auth.signInWithEmailAndPassword(
+          document.getElementById('login-email').value,
+          document.getElementById('login-password').value
+        );
         window.location.href = 'trading.html';
       } catch (err) {
         showError(err.message);
       }
     });
 
-    // Регистрация
     document.getElementById('register-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       hideMessages();
-      const email = document.getElementById('register-email').value;
-      const password = document.getElementById('register-password').value;
-      
       try {
-        const { data, error } = await supabaseClient.auth.signUp({ 
-          email, 
-          password,
-          options: {
-            emailRedirectTo: window.location.origin + '/trading.html'
-          }
-        });
-        if (error) throw error;
-        
-        if (data.user && !data.session) {
-          showSuccess('Регистрация успешна! Проверь email для подтверждения, затем войди.');
-        } else {
-          showSuccess('Регистрация успешна! Теперь войди.');
-          document.querySelector('[data-tab="login"]').click();
-        }
+        await auth.createUserWithEmailAndPassword(
+          document.getElementById('register-email').value,
+          document.getElementById('register-password').value
+        );
+        showSuccess('Регистрация успешна!');
+        setTimeout(() => window.location.href = 'trading.html', 1000);
       } catch (err) {
         showError(err.message);
       }
     });
 
-    // Продолжить как гость
     document.getElementById('continue-guest').addEventListener('click', () => {
       localStorage.setItem('guest_mode', 'true');
       window.location.href = 'trading.html';
@@ -257,17 +218,11 @@
       document.getElementById('success-msg').style.display = 'none';
     }
 
-    // Проверяем есть ли активная сессия
-    (async () => {
-      try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session) {
-          window.location.href = 'trading.html';
-        }
-      } catch (e) {
-        console.log('Session check error:', e);
+    auth.onAuthStateChanged((user) => {
+      if (user && !localStorage.getItem('guest_mode')) {
+        window.location.href = 'trading.html';
       }
-    })();
+    });
   </script>
 </body>
 </html>
