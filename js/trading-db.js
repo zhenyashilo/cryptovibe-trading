@@ -1,251 +1,126 @@
-// TradingDB - адаптирован для работы с Supabase
 const TradingDB = {
-  DB_NAME: 'CryptoVibeTrading',
-  DB_VERSION: 4,
-  STORE_NAME: 'trades',
-  PLANS_STORE: 'plans',
-  DIARY_STORE: 'diary',
-  SETTINGS_STORE: 'settings',
-  
-  db: null,
-  useSupabase: false,
+  useFirebase: false,
 
   async init() {
-    // Проверяем доступен ли Supabase
-    if (typeof SupabaseClient !== 'undefined' && SupabaseClient.isAuthenticated()) {
-      this.useSupabase = true;
-      console.log('Using Supabase');
-    } else {
-      // Fallback на IndexedDB
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          this.db = request.result;
-          console.log('TradingDB initialized (IndexedDB)');
-          resolve();
-        };
-        request.onupgradeneeded = (event) => {
-          const db = event.target.result;
-          if (!db.objectStoreNames.contains(this.STORE_NAME)) {
-            const store = db.createObjectStore(this.STORE_NAME, { keyPath: 'id' });
-            store.createIndex('date', 'date', { unique: false });
-          }
-          if (!db.objectStoreNames.contains(this.PLANS_STORE)) {
-            const s = db.createObjectStore(this.PLANS_STORE, { keyPath: 'id' });
-            s.createIndex('status', 'status', { unique: false });
-          }
-          if (!db.objectStoreNames.contains(this.DIARY_STORE)) {
-            const s = db.createObjectStore(this.DIARY_STORE, { keyPath: 'id' });
-            s.createIndex('date', 'date', { unique: false });
-          }
-          if (!db.objectStoreNames.contains(this.SETTINGS_STORE)) {
-            db.createObjectStore(this.SETTINGS_STORE, { keyPath: 'key' });
-          }
-        };
-      });
+    if (typeof FirebaseClient !== 'undefined') {
+      await FirebaseClient.init();
+      if (FirebaseClient.isAuthenticated()) {
+        this.useFirebase = true;
+        console.log('Using Firebase');
+        return;
+      }
     }
+    this.useFirebase = false;
+    console.log('Using localStorage (guest mode)');
   },
 
   async getAll() {
-    if (this.useSupabase) {
-      return await SupabaseClient.getTrades();
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.STORE_NAME], 'readonly');
-        const req = tx.objectStore(this.STORE_NAME).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
-      });
-    }
+    if (this.useFirebase) return await FirebaseClient.getTrades();
+    const data = localStorage.getItem('trades');
+    return data ? JSON.parse(data) : [];
   },
 
-  async add(t) {
-    if (this.useSupabase) {
-      return await SupabaseClient.addTrade(t);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
-        const req = tx.objectStore(this.STORE_NAME).add(t);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    }
+  async add(trade) {
+    if (this.useFirebase) return await FirebaseClient.addTrade(trade);
+    const trades = await this.getAll();
+    trades.push(trade);
+    localStorage.setItem('trades', JSON.stringify(trades));
+    return trade;
   },
 
-  async update(t) {
-    if (this.useSupabase) {
-      return await SupabaseClient.updateTrade(t);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
-        const req = tx.objectStore(this.STORE_NAME).put(t);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    }
+  async update(trade) {
+    if (this.useFirebase) return await FirebaseClient.updateTrade(trade.id, trade);
+    const trades = await this.getAll();
+    const idx = trades.findIndex(t => t.id === trade.id);
+    if (idx !== -1) trades[idx] = trade;
+    localStorage.setItem('trades', JSON.stringify(trades));
+    return trade;
   },
 
   async delete(id) {
-    if (this.useSupabase) {
-      return await SupabaseClient.deleteTrade(id);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
-        const req = tx.objectStore(this.STORE_NAME).delete(id);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
-    }
+    if (this.useFirebase) return await FirebaseClient.deleteTrade(id);
+    const trades = await this.getAll();
+    localStorage.setItem('trades', JSON.stringify(trades.filter(t => t.id !== id)));
   },
 
   async getAllPlans() {
-    if (this.useSupabase) {
-      return await SupabaseClient.getPlans();
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.PLANS_STORE], 'readonly');
-        const req = tx.objectStore(this.PLANS_STORE).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
-      });
-    }
+    if (this.useFirebase) return await FirebaseClient.getPlans();
+    const data = localStorage.getItem('plans');
+    return data ? JSON.parse(data) : [];
   },
 
-  async addPlan(p) {
-    if (this.useSupabase) {
-      return await SupabaseClient.addPlan(p);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.PLANS_STORE], 'readwrite');
-        const req = tx.objectStore(this.PLANS_STORE).add(p);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    }
+  async addPlan(plan) {
+    if (this.useFirebase) return await FirebaseClient.addPlan(plan);
+    const plans = await this.getAllPlans();
+    plans.push(plan);
+    localStorage.setItem('plans', JSON.stringify(plans));
+    return plan;
   },
 
-  async updatePlan(p) {
-    if (this.useSupabase) {
-      return await SupabaseClient.updatePlan(p);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.PLANS_STORE], 'readwrite');
-        const req = tx.objectStore(this.PLANS_STORE).put(p);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    }
+  async updatePlan(plan) {
+    if (this.useFirebase) return await FirebaseClient.updatePlan(plan.id, plan);
+    const plans = await this.getAllPlans();
+    const idx = plans.findIndex(p => p.id === plan.id);
+    if (idx !== -1) plans[idx] = plan;
+    localStorage.setItem('plans', JSON.stringify(plans));
+    return plan;
   },
 
   async deletePlan(id) {
-    if (this.useSupabase) {
-      return await SupabaseClient.deletePlan(id);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.PLANS_STORE], 'readwrite');
-        const req = tx.objectStore(this.PLANS_STORE).delete(id);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
-    }
+    if (this.useFirebase) return await FirebaseClient.deletePlan(id);
+    const plans = await this.getAllPlans();
+    localStorage.setItem('plans', JSON.stringify(plans.filter(p => p.id !== id)));
   },
 
   async getAllDiary() {
-    if (this.useSupabase) {
-      return await SupabaseClient.getDiary();
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.DIARY_STORE], 'readonly');
-        const req = tx.objectStore(this.DIARY_STORE).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
-      });
-    }
+    if (this.useFirebase) return await FirebaseClient.getDiary();
+    const data = localStorage.getItem('diary');
+    return data ? JSON.parse(data) : [];
   },
 
-  async addDiary(d) {
-    if (this.useSupabase) {
-      return await SupabaseClient.addDiary(d);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.DIARY_STORE], 'readwrite');
-        const req = tx.objectStore(this.DIARY_STORE).add(d);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    }
+  async addDiary(entry) {
+    if (this.useFirebase) return await FirebaseClient.addDiary(entry);
+    const diary = await this.getAllDiary();
+    diary.push(entry);
+    localStorage.setItem('diary', JSON.stringify(diary));
+    return entry;
   },
 
-  async updateDiary(d) {
-    if (this.useSupabase) {
-      return await SupabaseClient.updateDiary(d);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.DIARY_STORE], 'readwrite');
-        const req = tx.objectStore(this.DIARY_STORE).put(d);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    }
+  async updateDiary(entry) {
+    if (this.useFirebase) return await FirebaseClient.updateDiary(entry.id, entry);
+    const diary = await this.getAllDiary();
+    const idx = diary.findIndex(d => d.id === entry.id);
+    if (idx !== -1) diary[idx] = entry;
+    localStorage.setItem('diary', JSON.stringify(diary));
+    return entry;
   },
 
   async deleteDiary(id) {
-    if (this.useSupabase) {
-      return await SupabaseClient.deleteDiary(id);
-    } else {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([this.DIARY_STORE], 'readwrite');
-        const req = tx.objectStore(this.DIARY_STORE).delete(id);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
-    }
+    if (this.useFirebase) return await FirebaseClient.deleteDiary(id);
+    const diary = await this.getAllDiary();
+    localStorage.setItem('diary', JSON.stringify(diary.filter(d => d.id !== id)));
   },
 
   async getSetting(key) {
-    if (this.useSupabase) {
-      const settings = await SupabaseClient.getSettings();
-      if (!settings) return 0;
-      return settings[key] || 0;
-    } else {
-      return new Promise((resolve) => {
-        try {
-          if (!this.db.objectStoreNames.contains(this.SETTINGS_STORE)) {
-            resolve(0);
-            return;
-          }
-          const tx = this.db.transaction([this.SETTINGS_STORE], 'readonly');
-          const req = tx.objectStore(this.SETTINGS_STORE).get(key);
-          req.onsuccess = () => resolve(req.result?.value || 0);
-          req.onerror = () => resolve(0);
-        } catch (e) {
-          resolve(0);
-        }
-      });
+    if (this.useFirebase) {
+      const settings = await FirebaseClient.getSettings();
+      return settings ? settings[key] : 0;
     }
+    const data = localStorage.getItem('settings');
+    const settings = data ? JSON.parse(data) : {};
+    return settings[key] || 0;
   },
 
   async saveSetting(key, value) {
-    if (this.useSupabase) {
-      const settings = await SupabaseClient.getSettings() || {};
+    if (this.useFirebase) {
+      const settings = await FirebaseClient.getSettings() || {};
       settings[key] = value;
-      await SupabaseClient.saveSettings(settings);
+      await FirebaseClient.saveSettings(settings);
     } else {
-      return new Promise((resolve) => {
-        try {
-          if (!this.db.objectStoreNames.contains(this.SETTINGS_STORE)) {
-            resolve();
-            return;
-          }
-          const tx = this.db.transaction([this.SETTINGS_STORE], 'readwrite');
-          const req = tx.objectStore(this.SETTINGS_STORE).put({ key, value });
-          req.onsuccess = () => resolve();
-          req.onerror = () => resolve();
-        } catch (e) {
-          resolve();
-        }
-      });
+      const data = localStorage.getItem('settings');
+      const settings = data ? JSON.parse(data) : {};
+      settings[key] = value;
+      localStorage.setItem('settings', JSON.stringify(settings));
     }
   }
 };
