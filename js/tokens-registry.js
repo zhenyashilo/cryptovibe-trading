@@ -1,25 +1,22 @@
 // Модуль управления токенами STON.fi
-// Теперь синхронизируется через Firebase!
+// Теперь НАДЁЖНО синхронизируется через Firebase!
 
 const TokensRegistry = {
-  useFirebase: false,
-
-  async init() {
-    // Проверяем, доступен ли Firebase и авторизован ли пользователь
+  
+  // Надёжная проверка авторизации с ожиданием инициализации
+  async _isAuthenticated() {
     if (typeof FirebaseClient !== 'undefined') {
-      await FirebaseClient.init();
-      if (FirebaseClient.isAuthenticated()) {
-        this.useFirebase = true;
-        console.log('TokensRegistry: Using Firebase');
-        return;
+      // Если пользователь еще не проверен, ждем инициализации
+      if (FirebaseClient.currentUser === null && typeof FirebaseClient.init === 'function') {
+        await FirebaseClient.init();
       }
+      return FirebaseClient.currentUser !== null;
     }
-    this.useFirebase = false;
-    console.log('TokensRegistry: Using localStorage (guest mode)');
+    return false;
   },
 
   async getAll() {
-    if (this.useFirebase) {
+    if (await this._isAuthenticated()) {
       const snapshot = await firebase.firestore().collection('ston_tokens')
         .where('userId', '==', FirebaseClient.currentUser.uid)
         .get();
@@ -31,7 +28,7 @@ const TokensRegistry = {
   },
 
   async add(token) {
-    if (this.useFirebase) {
+    if (await this._isAuthenticated()) {
       const docRef = await firebase.firestore().collection('ston_tokens').add({
         ...token,
         userId: FirebaseClient.currentUser.uid,
@@ -52,7 +49,7 @@ const TokensRegistry = {
   },
 
   async update(token) {
-    if (this.useFirebase) {
+    if (await this._isAuthenticated()) {
       await firebase.firestore().collection('ston_tokens').doc(token.id).update({
         ...token,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -70,7 +67,7 @@ const TokensRegistry = {
   },
 
   async delete(id) {
-    if (this.useFirebase) {
+    if (await this._isAuthenticated()) {
       await firebase.firestore().collection('ston_tokens').doc(id).delete();
     } else {
       const tokens = await this.getAll();
