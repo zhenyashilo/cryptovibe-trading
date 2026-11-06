@@ -72,6 +72,7 @@ const StonAPI = {
             price: priceUsd,
             dex: bestPair.dexId || 'dexscreener',
             poolName: `${bestPair.baseToken?.symbol}/${bestPair.quoteToken?.symbol}` || '',
+            tokenName: bestPair.baseToken?.symbol || null, // ✅ НОВОЕ ПОЛЕ
             priceChange24h: parseFloat(bestPair.priceChange?.h24 || '0'),
             source: 'DexScreener'
           };
@@ -121,6 +122,7 @@ const StonAPI = {
       dex: result.dex || 'unknown',
       priceChange24h: result.priceChange24h || 0,
       poolName: result.poolName || '',
+      tokenName: result.tokenName || null, // ✅ НОВОЕ ПОЛЕ
       source: result.source || 'unknown',
       fromStorage: result.fromStorage || false
     };
@@ -133,6 +135,7 @@ const StonAPI = {
         price: finalResult.price,
         dex: finalResult.dex,
         poolName: finalResult.poolName,
+        tokenName: finalResult.tokenName, // ✅ НОВОЕ ПОЛЕ
         priceChange24h: finalResult.priceChange24h,
         source: finalResult.source,
         timestamp: Date.now()
@@ -163,7 +166,6 @@ const StonAPI = {
     } catch (e) {}
   },
 
-  // ✅ НОВАЯ ФУНКЦИЯ: Получение списка доступных пулов для проверки токена
   async getAvailablePools(tokenAddress) {
     try {
       const url = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`;
