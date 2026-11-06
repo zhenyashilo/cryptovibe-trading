@@ -134,7 +134,7 @@ const StonPage = {
     const addresses = tokens.map(t => t.address);
     const prices = await StonAPI.getMultiplePrices(addresses);
     
-    for (const token of tokens) {
+    tokens.forEach(token => {
       const priceData = prices[token.address];
       const priceEl = document.getElementById(`price-${token.address}`);
       const statusEl = document.getElementById(`price-status-${token.address}`);
@@ -145,13 +145,11 @@ const StonPage = {
           priceEl.textContent = '$' + priceData.price.toFixed(8);
           priceEl.style.color = 'var(--neon-green)';
           
-          // Источник данных
           if (sourceEl) {
             sourceEl.textContent = priceData.fromStorage ? '(кэш)' : `(${priceData.source || ''})`;
             sourceEl.style.color = priceData.fromStorage ? 'var(--neon-yellow)' : 'var(--text-secondary)';
           }
           
-          // Статус
           if (statusEl) {
             if (priceData.fromStorage) {
               const minutesAgo = Math.floor((Date.now() - (priceData.lastSuccessfulTime || priceData.timestamp)) / 60000);
@@ -172,23 +170,7 @@ const StonPage = {
               statusEl.style.color = 'var(--neon-green)';
             }
           }
-
-          // ✅ АВТОМАТИЧЕСКОЕ ОБНОВЛЕНИЕ НАЗВАНИЯ ТОКЕНА
-          if (priceData.tokenName && priceData.tokenName !== token.name) {
-            console.log(`🔄 Обновляем название токена: ${token.name} → ${priceData.tokenName}`);
-            try {
-              await TokensRegistry.update({ ...token, name: priceData.tokenName });
-              // Обновляем отображение названия на странице
-              const nameEl = priceEl.closest('.token-item').querySelector('.token-name');
-              if (nameEl) nameEl.textContent = priceData.tokenName;
-              const iconEl = priceEl.closest('.token-item').querySelector('.token-icon');
-              if (iconEl) iconEl.textContent = priceData.tokenName.substring(0, 2).toUpperCase();
-            } catch (err) {
-              console.error('Ошибка обновления названия:', err);
-            }
-          }
         } else {
-          // Даже если нет данных — показываем последнюю известную цену
           const lastKnown = StonAPI.getLastKnownPrice(token.address);
           if (lastKnown && lastKnown.price > 0) {
             priceEl.textContent = '$' + lastKnown.price.toFixed(8);
@@ -215,7 +197,7 @@ const StonPage = {
           }
         }
       }
-    }
+    });
 
     const timeEl = document.getElementById('last-update-time');
     if (timeEl) {
@@ -224,7 +206,6 @@ const StonPage = {
   },
 
   async refreshTokenPrice(address) {
-    // Принудительная очистка кэша для этого токена
     StonAPI._cache.delete(address + ':USD');
     
     const priceEl = document.getElementById(`price-${address}`);
@@ -310,7 +291,6 @@ const StonPage = {
           let msg = `✅ Цена: $${priceData.price.toFixed(8)}`;
           msg += ` | Источник: ${priceData.source}`;
           if (priceData.poolName) msg += ` | Пул: ${priceData.poolName}`;
-          if (priceData.tokenName) msg += ` | Название: ${priceData.tokenName}`;
           if (priceData.priceChange24h !== 0) {
             const sign = priceData.priceChange24h > 0 ? '+' : '';
             msg += ` | 24ч: ${sign}${priceData.priceChange24h.toFixed(2)}%`;
