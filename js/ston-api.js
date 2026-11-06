@@ -161,5 +161,19 @@ const StonAPI = {
       localStorage.removeItem(this.STORAGE_KEY);
       localStorage.removeItem(this.STORAGE_TTL_KEY);
     } catch (e) {}
+  },
+
+  // ✅ НОВАЯ ФУНКЦИЯ: Получение списка доступных пулов для проверки токена
+  async getAvailablePools(tokenAddress) {
+    try {
+      const url = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`;
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.pairs || [];
+    } catch (e) {
+      console.log('getAvailablePools error:', e.message);
+      return [];
+    }
   }
 };
