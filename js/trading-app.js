@@ -21,16 +21,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   ];
 
   try {
-    // Проверяем авторизацию
+    // Проверяем авторизацию (Firebase вместо Supabase)
     const isGuest = localStorage.getItem('guest_mode') === 'true';
     
-    if (typeof SupabaseClient !== 'undefined') {
-      await SupabaseClient.init();
+    if (typeof FirebaseClient !== 'undefined') {
+      await FirebaseClient.init();
+      
+      // Ждём пока Firebase определит состояние авторизации
+      await new Promise(resolve => {
+        FirebaseClient.onAuthReady(() => resolve());
+      });
       
       // Если не авторизован и не гость - редирект на auth.html
-      if (!SupabaseClient.isAuthenticated() && !isGuest) {
+      if (!FirebaseClient.isAuthenticated() && !isGuest) {
         window.location.href = 'auth.html';
         return;
+      }
+      
+      // Миграция токенов из localStorage в Firebase
+      if (FirebaseClient.isAuthenticated()) {
+        console.log('🔄 Проверяем миграцию токенов...');
+        await FirebaseClient.migrateTokensFromLocalStorage();
       }
     }
     
@@ -153,8 +164,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (t.id === 'logout-btn') {
-      if (typeof SupabaseClient !== 'undefined' && SupabaseClient.isAuthenticated()) {
-        await SupabaseClient.signOut();
+      if (typeof FirebaseClient !== 'undefined' && FirebaseClient.isAuthenticated()) {
+        await FirebaseClient.signOut();
         localStorage.removeItem('guest_mode');
         window.location.href = 'auth.html';
       } else {
@@ -706,8 +717,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const m = document.getElementById('main-content');
     const ns = typeof Notifications !== 'undefined' ? Notifications.tradingSettings : {};
     const notifEnabled = typeof Notifications !== 'undefined' && Notification.permission === 'granted';
-    const isAuth = typeof SupabaseClient !== 'undefined' && SupabaseClient.isAuthenticated();
-    const userEmail = isAuth ? SupabaseClient.getCurrentUser()?.email : (localStorage.getItem('guest_mode') === 'true' ? 'Гость' : 'Не авторизован');
+    
+    // ИСПРАВЛЕНО: используем FirebaseClient вместо SupabaseClient
+    const isAuth = typeof FirebaseClient !== 'undefined' && FirebaseClient.isAuthenticated();
+    const userEmail = isAuth ? FirebaseClient.getCurrentUser()?.email : (localStorage.getItem('guest_mode') === 'true' ? 'Гость' : 'Не авторизован');
     
     m.innerHTML = `<section class="section"><div class="section-header"><h2>⚙️ Настройки</h2></div>
       
