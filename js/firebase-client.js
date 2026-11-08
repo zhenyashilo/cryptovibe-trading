@@ -17,15 +17,74 @@ const auth = firebase.auth();
 // Модуль для работы с Firebase
 const FirebaseClient = {
   currentUser: null,
+  authReadyCallbacks: [],
+  authReady: false,
 
   async init() {
     return new Promise((resolve) => {
       auth.onAuthStateChanged((user) => {
         this.currentUser = user;
         console.log('Auth state changed:', user ? user.email : 'No user');
+        
+        if (!this.authReady) {
+          this.authReady = true;
+          // Вызываем все коллбеки ожидания
+          this.authReadyCallbacks.forEach(cb => cb(user));
+          this.authReadyCallbacks = [];
+        }
+        
         resolve();
       });
     });
+  },
+
+  // Ждать пока авторизация определится
+  onAuthReady(callback) {
+    if (this.authReady) {
+      callback(this.currentUser);
+    } else {
+      this.authReadyCallbacks.push(callback);
+    }
+  },
+
+  // Миграция токенов из localStorage в Firebase
+  async migrateTokensFromLocalStorage() {
+    if (!this.currentUser) return;
+    
+    const localData = localStorage.getItem('ston_tokens');
+    if (!localData) return;
+    
+    try {
+      const localTokens = JSON.parse(localData);
+      if (!Array.isArray(localTokens) || localTokens.length === 0) return;
+      
+      console.log(`🔄 Миграция ${localTokens.length} токенов из localStorage в Firebase...`);
+      
+      // Проверяем есть ли уже токены в Firebase
+      const existingSnapshot = await db.collection('ston_tokens')
+        .where('userId', '==', this.currentUser.uid)
+        .get();
+      
+      if (existingSnapshot.docs.length > 0) {
+        console.log('✅ Токены уже есть в Firebase, пропускаем миграцию');
+        localStorage.removeItem('ston_tokens');
+        return;
+      }
+      
+      // Мигрируем каждый токен
+      for (const token of localTokens) {
+        await db.collection('ston_tokens').add({
+          ...token,
+          userId: this.currentUser.uid,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      
+      console.log('✅ Миграция завершена');
+      localStorage.removeItem('ston_tokens');
+    } catch (err) {
+      console.error('Ошибка миграции:', err);
+    }
   },
 
   async signUp(email, password) {
