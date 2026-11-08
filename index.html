@@ -360,17 +360,19 @@
     <a href="#/settings" data-route="settings"><span class="icon">⚙️</span>Ещё</a>
   </nav>
 
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK (ОБЯЗАТЕЛЬНО перед firebase-client.js) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  
+  <!-- Firebase клиент -->
   <script src="js/firebase-client.js"></script>
-
+  
   <!-- Токены STON.fi -->
   <script src="js/tokens-registry.js"></script>
   <script src="js/ston-api.js"></script>
   <script src="js/ston-page.js"></script>
-
+  
   <!-- Остальные скрипты -->
   <script src="js/db.js"></script>
   <script src="js/notifications.js"></script>
