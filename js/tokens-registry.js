@@ -1,40 +1,27 @@
 // Модуль управления токенами STON.fi
-// Синхронизация через Firebase
+// Использует Firebase напрямую, без ожидания инициализации
 
 const TokensRegistry = {
-  useFirebase: false,
-
-  async init() {
-    if (typeof FirebaseClient !== 'undefined') {
-      await FirebaseClient.init();
-      if (FirebaseClient.isAuthenticated()) {
-        this.useFirebase = true;
-        console.log('TokensRegistry: Using Firebase');
-        return;
+  async getAll() {
+    // Если Firebase доступен и пользователь авторизован — используем Firestore
+    if (typeof FirebaseClient !== 'undefined' && FirebaseClient.currentUser) {
+      try {
+        const snapshot = await firebase.firestore().collection('ston_tokens')
+          .where('userId', '==', FirebaseClient.currentUser.uid)
+          .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (err) {
+        console.error('TokensRegistry.getAll error:', err);
+        return [];
       }
     }
-    this.useFirebase = false;
-    console.log('TokensRegistry: Using localStorage (guest mode)');
-  },
-
-  async getAll() {
-    await this.init();
-    
-    if (this.useFirebase) {
-      const snapshot = await firebase.firestore().collection('ston_tokens')
-        .where('userId', '==', FirebaseClient.currentUser.uid)
-        .get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } else {
-      const data = localStorage.getItem('ston_tokens');
-      return data ? JSON.parse(data) : [];
-    }
+    // Иначе — localStorage (гостевой режим)
+    const data = localStorage.getItem('ston_tokens');
+    return data ? JSON.parse(data) : [];
   },
 
   async add(token) {
-    await this.init();
-    
-    if (this.useFirebase) {
+    if (typeof FirebaseClient !== 'undefined' && FirebaseClient.currentUser) {
       const docRef = await firebase.firestore().collection('ston_tokens').add({
         ...token,
         userId: FirebaseClient.currentUser.uid,
@@ -55,9 +42,7 @@ const TokensRegistry = {
   },
 
   async update(token) {
-    await this.init();
-    
-    if (this.useFirebase) {
+    if (typeof FirebaseClient !== 'undefined' && FirebaseClient.currentUser) {
       await firebase.firestore().collection('ston_tokens').doc(token.id).update({
         ...token,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -75,9 +60,7 @@ const TokensRegistry = {
   },
 
   async delete(id) {
-    await this.init();
-    
-    if (this.useFirebase) {
+    if (typeof FirebaseClient !== 'undefined' && FirebaseClient.currentUser) {
       await firebase.firestore().collection('ston_tokens').doc(id).delete();
     } else {
       const tokens = await this.getAll();
