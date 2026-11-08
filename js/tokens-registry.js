@@ -1,27 +1,34 @@
 // Модуль управления токенами STON.fi
-// Использует Firebase напрямую, без ожидания инициализации
+// Теперь НАДЁЖНО синхронизируется через Firebase!
 
 const TokensRegistry = {
-  async getAll() {
-    // Если Firebase доступен и пользователь авторизован — используем Firestore
-    if (typeof FirebaseClient !== 'undefined' && FirebaseClient.currentUser) {
-      try {
-        const snapshot = await firebase.firestore().collection('ston_tokens')
-          .where('userId', '==', FirebaseClient.currentUser.uid)
-          .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } catch (err) {
-        console.error('TokensRegistry.getAll error:', err);
-        return [];
+  
+  // Надёжная проверка авторизации с ожиданием инициализации
+  async _isAuthenticated() {
+    if (typeof FirebaseClient !== 'undefined') {
+      // Если пользователь еще не проверен, ждем инициализации
+      if (FirebaseClient.currentUser === null && typeof FirebaseClient.init === 'function') {
+        await FirebaseClient.init();
       }
+      return FirebaseClient.currentUser !== null;
     }
-    // Иначе — localStorage (гостевой режим)
-    const data = localStorage.getItem('ston_tokens');
-    return data ? JSON.parse(data) : [];
+    return false;
+  },
+
+  async getAll() {
+    if (await this._isAuthenticated()) {
+      const snapshot = await firebase.firestore().collection('ston_tokens')
+        .where('userId', '==', FirebaseClient.currentUser.uid)
+        .get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } else {
+      const data = localStorage.getItem('ston_tokens');
+      return data ? JSON.parse(data) : [];
+    }
   },
 
   async add(token) {
-    if (typeof FirebaseClient !== 'undefined' && FirebaseClient.currentUser) {
+    if (await this._isAuthenticated()) {
       const docRef = await firebase.firestore().collection('ston_tokens').add({
         ...token,
         userId: FirebaseClient.currentUser.uid,
@@ -42,7 +49,7 @@ const TokensRegistry = {
   },
 
   async update(token) {
-    if (typeof FirebaseClient !== 'undefined' && FirebaseClient.currentUser) {
+    if (await this._isAuthenticated()) {
       await firebase.firestore().collection('ston_tokens').doc(token.id).update({
         ...token,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -60,7 +67,7 @@ const TokensRegistry = {
   },
 
   async delete(id) {
-    if (typeof FirebaseClient !== 'undefined' && FirebaseClient.currentUser) {
+    if (await this._isAuthenticated()) {
       await firebase.firestore().collection('ston_tokens').doc(id).delete();
     } else {
       const tokens = await this.getAll();
@@ -74,9 +81,11 @@ const TokensRegistry = {
     return all.find(t => t.address.toLowerCase() === address.toLowerCase());
   },
 
+  // Валидация адреса TON
   isValidAddress(address) {
     if (!address) return false;
     const trimmed = address.trim();
+    // Формат: EQ... или UQ... , 48 символов base64url
     return /^(EQ|UQ)[A-Za-z0-9_-]{46}$/.test(trimmed);
   }
 };
