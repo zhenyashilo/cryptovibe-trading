@@ -17,27 +17,15 @@ const auth = firebase.auth();
 // Модуль для работы с Firebase
 const FirebaseClient = {
   currentUser: null,
-  initialized: false,
 
   async init() {
-    if (this.initialized) return;
-    
-    // Используем authStateReady() — ждёт пока Firebase определит авторизацию
-    if (typeof auth.authStateReady === 'function') {
-      await auth.authStateReady();
-      this.currentUser = auth.currentUser;
-    } else {
-      // Fallback для старых версий
-      await new Promise((resolve) => {
-        auth.onAuthStateChanged((user) => {
-          this.currentUser = user;
-          resolve();
-        });
+    return new Promise((resolve) => {
+      auth.onAuthStateChanged((user) => {
+        this.currentUser = user;
+        console.log('Auth state changed:', user ? user.email : 'No user');
+        resolve();
       });
-    }
-    
-    this.initialized = true;
-    console.log('✅ FirebaseClient initialized:', this.currentUser ? this.currentUser.email : 'No user');
+    });
   },
 
   async signUp(email, password) {
