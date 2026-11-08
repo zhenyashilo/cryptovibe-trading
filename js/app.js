@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     for (const [currency, amount] of Object.entries(aggregated.investedCurrencies || {})) {
       if (amount > 0) {
-        parts.push(parseFloat(amount).toLocaleString('en-US', { maximumFractionDigits: 4 }) + ' ' + currency);
+        parts.push(`${parseFloat(amount).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${currency}`);
       }
     }
     return parts.length > 0 ? parts.join(' + ') : '$0.00';
@@ -109,7 +109,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (oldList) oldList.remove();
     const suggestionsList = document.createElement('div');
     suggestionsList.className = 'autocomplete-suggestions';
-    suggestionsList.style.cssText = 'position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-secondary); border: var(--glass-border); border-radius: 8px; max-height: 250px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: none;';
+    suggestionsList.style.cssText = `
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      border: var(--glass-border);
+      border-radius: 8px;
+      max-height: 250px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      display: none;
+    `;
     input.parentElement.style.position = 'relative';
     input.parentElement.appendChild(suggestionsList);
     let stonTokensCache = [];
@@ -163,7 +176,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const badge = item.fromSton 
           ? '<span style="font-size:0.65rem; background: rgba(0, 255, 157, 0.15); color: var(--neon-green); padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.5rem;">STON</span>'
           : '';
-        return '<div class="autocomplete-item" data-name="' + item.name + '" style="padding: 0.75rem; cursor: pointer; transition: background 0.15s; font-size: 0.95rem; display: flex; align-items: center; ' + (isExact ? 'background: rgba(0, 243, 255, 0.05);' : '') + '"><span style="flex: 1;">' + item.name + badge + '</span>' + (isExact ? '<span style="font-size:0.7rem; color:var(--neon-cyan);">(текущее)</span>' : '') + '</div>';
+        return `
+          <div class="autocomplete-item" data-name="${item.name}" style="
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: background 0.15s;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            ${isExact ? 'background: rgba(0, 243, 255, 0.05);' : ''}
+          ">
+            <span style="flex: 1;">${item.name}${badge}</span>
+            ${isExact ? '<span style="font-size:0.7rem; color:var(--neon-cyan);">(текущее)</span>' : ''}
+          </div>
+        `;
       }).join('');
       suggestionsList.style.display = 'block';
       suggestionsList.querySelectorAll('.autocomplete-item').forEach(item => {
@@ -196,12 +222,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!typeSelect) return;
     const list = typeSelect.querySelector('.custom-select-list');
     if (!list) return;
-    list.innerHTML = operationTypes.map(t => '<div class="custom-select-option" data-value="' + t.key + '"><span>' + t.label + '</span>' + (!t.default ? '<button type="button" class="delete-type-btn" data-key="' + t.key + '">&times;</button>' : '') + '</div>').join('');
+    list.innerHTML = operationTypes.map(t => `
+      <div class="custom-select-option" data-value="${t.key}">
+        <span>${t.label}</span>
+        ${!t.default ? `<button type="button" class="delete-type-btn" data-key="${t.key}">&times;</button>` : ''}
+      </div>
+    `).join('');
     list.querySelectorAll('.delete-type-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const key = btn.dataset.key;
-        if (confirm('Удалить тип "' + getTypeLabel(key) + '"?')) {
+        if (confirm(`Удалить тип "${getTypeLabel(key)}"?`)) {
           await DB.deleteType(key);
           operationTypes = operationTypes.filter(t => t.key !== key);
           renderTypeOptions();
@@ -344,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     console.log('=== FIFO расчёт ===');
     sorted.forEach(tx => {
-      console.log(tx.date + ' ' + (tx.time || '00:00') + ' ' + tx.type + ' ' + tx.quantity);
+      console.log(`${tx.date} ${tx.time || '00:00'} ${tx.type} ${tx.quantity}`);
     });
     sorted.forEach(tx => {
       if (tx.type === 'buy') {
@@ -563,26 +594,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let isNegative = false;
     if (isBotTokenPayout) {
       const qty = parseFloat(tx.quantity) || 0;
-      displayText = qty.toLocaleString('en-US') + ' ' + (tx.name || '') + ' токенов';
+      displayText = `${qty.toLocaleString('en-US')} ${tx.name || ''} токенов`;
       isPositive = true;
     } else if (isEarningBot) {
       usdt = parseFloat(tx.amount || tx.usdtValue) || 0;
       const currency = (tx.currency || 'USDT').toUpperCase();
-      displayText = usdt.toLocaleString('en-US') + ' ' + currency;
+      displayText = `${usdt.toLocaleString('en-US')} ${currency}`;
       isPositive = tx.type === 'earning_payout';
       isNegative = tx.type === 'earning_invest';
     } else if (isFinance) {
       usdt = parseFloat(tx.usdtValue) || 0;
-      displayText = '$' + usdt.toFixed(2);
+      displayText = `$${usdt.toFixed(2)}`;
       isPositive = tx.type === 'deposit';
       isNegative = tx.type === 'ad_expense';
     } else if (isToken) {
       usdt = parseFloat(tx.usdtValue) || 0;
       const qty = parseFloat(tx.quantity) || 0;
       const price = qty > 0 && usdt > 0 ? (usdt / qty) : 0;
-      const qtyText = qty ? qty.toLocaleString('en-US') + ' ' + (tx.name || '') : '';
-      const priceText = price > 0 ? ' @ ' + formatPrice(price) : '';
-      displayText = qtyText + priceText;
+      const qtyText = qty ? `${qty.toLocaleString('en-US')} ${tx.name || ''}` : '';
+      const priceText = price > 0 ? ` @ ${formatPrice(price)}` : '';
+      displayText = `${qtyText}${priceText}`;
       isPositive = tx.type === 'sell';
       isNegative = tx.type === 'buy';
     }
@@ -608,14 +639,33 @@ document.addEventListener('DOMContentLoaded', () => {
         const diffPercent = buyPrice > 0 ? (diff / buyPrice * 100) : 0;
         const diffColor = diff >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
         const diffSign = diff >= 0 ? '+' : '';
-        currentPriceInfo = '<div class="tx-current-price" style="font-size: 0.75rem; color: var(--neon-cyan); margin-top: 0.25rem;">Текущий курс: $' + currentPrice.toFixed(8) + ' (' + diffSign + diffPercent.toFixed(1) + '%)</div>';
+        currentPriceInfo = `
+          <div class="tx-current-price" style="font-size: 0.75rem; color: var(--neon-cyan); margin-top: 0.25rem;">
+            Текущий курс: $${currentPrice.toFixed(8)} (${diffSign}${diffPercent.toFixed(1)}%)
+          </div>
+        `;
       }
     }
-    const timeDisplay = tx.time ? ' ' + tx.time : '';
-    return '<article class="tx-item ' + (tx.type === 'buy' && openBuyIds.has(tx.id) ? 'tx-open' : '') + '"><div class="tx-info"><h4><span class="tx-badge ' + getBadgeClass(tx.type) + '">' + typeLabel + '</span> ' + (tx.name || 'Без названия') + ' ' + statusBadge + '</h4><div class="tx-meta">' + tx.date + timeDisplay + ' • ' + displayText + '</div>' + currentPriceInfo + '</div><div class="tx-amount ' + (isPositive ? 'pos' : (isNegative ? 'neg' : 'neutral')) + '">' + amountDisplay + '</div><div class="tx-actions"><button class="tx-action-btn edit" data-id="' + tx.id + '">✏️</button><button class="tx-action-btn delete" data-id="' + tx.id + '">🗑️</button></div></article>';
+    const timeDisplay = tx.time ? ` ${tx.time}` : '';
+    return `
+      <article class="tx-item ${tx.type === 'buy' && openBuyIds.has(tx.id) ? 'tx-open' : ''}">
+        <div class="tx-info">
+          <h4><span class="tx-badge ${getBadgeClass(tx.type)}">${typeLabel}</span> ${tx.name || 'Без названия'} ${statusBadge}</h4>
+          <div class="tx-meta">${tx.date}${timeDisplay} • ${displayText}</div>
+          ${currentPriceInfo}
+        </div>
+        <div class="tx-amount ${isPositive ? 'pos' : (isNegative ? 'neg' : 'neutral')}">
+          ${amountDisplay}
+        </div>
+        <div class="tx-actions">
+          <button class="tx-action-btn edit" data-id="${tx.id}">✏️</button>
+          <button class="tx-action-btn delete" data-id="${tx.id}">🗑️</button>
+        </div>
+      </article>
+    `;
   };
-  const renderPeriodFilter = () => '<div class="period-filter"> <button class="period-btn ' + (currentPeriod === 'week' ? 'active' : '') + '" data-period="week">7 дней</button> <button class="period-btn ' + (currentPeriod === 'month' ? 'active' : '') + '" data-period="month">30 дней</button> <button class="period-btn ' + (currentPeriod === 'year' ? 'active' : '') + '" data-period="year">Год</button> <button class="period-btn ' + (currentPeriod === 'all' ? 'active' : '') + '" data-period="all">Всё время</button> </div>';
-  const renderTokenPeriodFilter = () => '<div class="period-filter"> <button class="period-btn ' + (currentTokenPeriod === 'week' ? 'active' : '') + '" data-token-period="week">7 дней</button> <button class="period-btn ' + (currentTokenPeriod === 'month' ? 'active' : '') + '" data-token-period="month">30 дней</button> <button class="period-btn ' + (currentTokenPeriod === 'year' ? 'active' : '') + '" data-token-period="year">Год</button> <button class="period-btn ' + (currentTokenPeriod === 'all' ? 'active' : '') + '" data-token-period="all">Всё время</button> </div>';
+  const renderPeriodFilter = () => `<div class="period-filter"> <button class="period-btn ${currentPeriod === 'week' ? 'active' : ''}" data-period="week">7 дней</button> <button class="period-btn ${currentPeriod === 'month' ? 'active' : ''}" data-period="month">30 дней</button> <button class="period-btn ${currentPeriod === 'year' ? 'active' : ''}" data-period="year">Год</button> <button class="period-btn ${currentPeriod === 'all' ? 'active' : ''}" data-period="all">Всё время</button> </div>`;
+  const renderTokenPeriodFilter = () => `<div class="period-filter"> <button class="period-btn ${currentTokenPeriod === 'week' ? 'active' : ''}" data-token-period="week">7 дней</button> <button class="period-btn ${currentTokenPeriod === 'month' ? 'active' : ''}" data-token-period="month">30 дней</button> <button class="period-btn ${currentTokenPeriod === 'year' ? 'active' : ''}" data-token-period="year">Год</button> <button class="period-btn ${currentTokenPeriod === 'all' ? 'active' : ''}" data-token-period="all">Всё время</button> </div>`;
   const calculateTokenPeriodStats = (txs, period) => {
     const filtered = filterByPeriod(txs, period);
     const allAssets = aggregateTokens(filtered);
@@ -649,43 +699,161 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     });
-    return '<header class="page-header"><h1>Мой портфель</h1><p>Обзор всех активов и операций</p></header>' + renderPeriodFilter() + '<section class="stats-grid"><article class="stat-card"><h3>Прибыль (Токены USDT)</h3><p class="metric-value ' + (stats.tokenProfit >= 0 ? 'positive' : 'negative') + '">' + formatMoney(stats.tokenProfit) + '</p></article><article class="stat-card"><h3>Прибыль (Боты USDT)</h3><p class="metric-value ' + (stats.botProfitUSDT >= 0 ? 'positive' : 'negative') + '">' + formatMoney(stats.botProfitUSDT) + '</p></article><article class="stat-card"><h3>Прибыль (Боты GRAM)</h3><p class="metric-value ' + (stats.botProfitGRAM >= 0 ? 'positive' : 'negative') + '">' + formatGram(stats.botProfitGRAM) + '</p></article><article class="stat-card"><h3>Общая прибыль (USDT)</h3><p class="metric-value ' + (stats.totalProfitUSDT >= 0 ? 'positive' : 'negative') + '">' + formatMoney(stats.totalProfitUSDT) + '</p></article>' + (totalUnrealizedQty > 0 ? '<article class="stat-card" style="border-color: rgba(255, 230, 0, 0.3);"><h3>Открытые позиции</h3><p class="metric-value" style="color: var(--neon-yellow);">' + formatMoneyPlain(totalUnrealizedInvested) + '</p><span class="metric-sub">' + totalUnrealizedQty.toLocaleString('en-US') + ' токенов</span></article><article class="stat-card" style="border-color: rgba(0, 243, 255, 0.3);"><h3>Незафиксированная прибыль</h3><p class="metric-value ' + (totalPotentialProfit >= 0 ? 'positive' : 'negative') + '">' + formatMoney(totalPotentialProfit) + '</p><span class="metric-sub">при продаже по текущему курсу</span></article>' : '') + '</section><section class="section"><div class="section-header"><h2>Купленные токены</h2></div><div class="token-list">' + (tokens.length > 0 ? tokens.map(t => {
-      const currentPrice = window._currentPrices?.[t.name] || null;
-      const avgPrice = t.avgBuyPrice || 0;
-      let currentPriceHtml = '';
-      if (currentPrice && currentPrice > 0) {
-        const change = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice * 100) : 0;
-        const changeColor = change >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
-        const changeSign = change >= 0 ? '+' : '';
-        const changeArrow = change >= 0 ? '▲' : '▼';
-        currentPriceHtml = '<div class="token-sub">Текущая цена: <span style="color: var(--neon-cyan); font-weight: 600;">$' + currentPrice.toFixed(8) + '</span><span style="color: ' + changeColor + '; margin-left: 0.5rem;">' + changeArrow + ' ' + changeSign + change.toFixed(2) + '%</span></div>';
-      } else {
-        currentPriceHtml = '<div class="token-sub">Текущая цена: <span style="color: var(--text-secondary);">Нет данных</span></div>';
-      }
-      let openPositionHtml = '';
-      if (t.openPositions && t.openPositions.totalOpenQty > 0) {
-        const openInvested = t.openPositions.totalOpenInvested;
-        const openQty = t.openPositions.totalOpenQty;
-        const potentialProfit = currentPrice && currentPrice > 0 ? (openQty * currentPrice) - openInvested : 0;
-        const profitColor = potentialProfit >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
-        const profitSign = potentialProfit >= 0 ? '+' : '';
-        openPositionHtml = '<div class="token-sub" style="color: var(--neon-yellow); margin-top: 0.25rem;">⚠️ Открыто: ' + openQty.toLocaleString('en-US') + ' шт (' + formatMoneyPlain(openInvested) + ')' + (currentPrice && currentPrice > 0 ? ' | Потенциал: <span style="color: ' + profitColor + ';">' + profitSign + formatMoney(potentialProfit) + '</span>' : '') + '</div>';
-      }
-      return '<a href="#/token/' + encodeURIComponent(t.name) + '" class="token-item"><div class="token-info"><div class="token-icon">' + t.name.substring(0, 2) + '</div><div><div class="token-name">' + t.name + '</div><div class="token-sub">Количество: ' + parseFloat(t.quantity).toLocaleString('en-US') + '</div><div class="token-sub">Цена покупки: ' + formatPrice(avgPrice) + '</div>' + openPositionHtml + currentPriceHtml + '</div></div><div class="token-stats"><div class="token-value" style="color: ' + (t.invested > 0 ? 'var(--neon-red)' : 'var(--text-primary)') + ';">' + formatMoneyPlain(t.invested) + '</div></div></a>';
-    }).join('') : '<div class="empty-state">Нет купленных токенов</div>') + '</div></section>';
+    return `
+      <header class="page-header">
+        <h1>Мой портфель</h1>
+        <p>Обзор всех активов и операций</p>
+      </header>
+      ${renderPeriodFilter()}
+      <section class="stats-grid">
+        <article class="stat-card">
+          <h3>Прибыль (Токены USDT)</h3>
+          <p class="metric-value ${stats.tokenProfit >= 0 ? 'positive' : 'negative'}">${formatMoney(stats.tokenProfit)}</p>
+        </article>
+        <article class="stat-card">
+          <h3>Прибыль (Боты USDT)</h3>
+          <p class="metric-value ${stats.botProfitUSDT >= 0 ? 'positive' : 'negative'}">${formatMoney(stats.botProfitUSDT)}</p>
+        </article>
+        <article class="stat-card">
+          <h3>Прибыль (Боты GRAM)</h3>
+          <p class="metric-value ${stats.botProfitGRAM >= 0 ? 'positive' : 'negative'}">${formatGram(stats.botProfitGRAM)}</p>
+        </article>
+        <article class="stat-card">
+          <h3>Общая прибыль (USDT)</h3>
+          <p class="metric-value ${stats.totalProfitUSDT >= 0 ? 'positive' : 'negative'}">${formatMoney(stats.totalProfitUSDT)}</p>
+        </article>
+        ${totalUnrealizedQty > 0 ? `
+        <article class="stat-card" style="border-color: rgba(255, 230, 0, 0.3);">
+          <h3>Открытые позиции</h3>
+          <p class="metric-value" style="color: var(--neon-yellow);">${formatMoneyPlain(totalUnrealizedInvested)}</p>
+          <span class="metric-sub">${totalUnrealizedQty.toLocaleString('en-US')} токенов</span>
+        </article>
+        <article class="stat-card" style="border-color: rgba(0, 243, 255, 0.3);">
+          <h3>Незафиксированная прибыль</h3>
+          <p class="metric-value ${totalPotentialProfit >= 0 ? 'positive' : 'negative'}">${formatMoney(totalPotentialProfit)}</p>
+          <span class="metric-sub">при продаже по текущему курсу</span>
+        </article>
+        ` : ''}
+      </section>
+      <section class="section">
+        <div class="section-header"><h2>Купленные токены</h2></div>
+        <div class="token-list">
+          ${tokens.length > 0 ? tokens.map(t => {
+            const currentPrice = window._currentPrices?.[t.name] || null;
+            const avgPrice = t.avgBuyPrice || 0;
+            let currentPriceHtml = '';
+            if (currentPrice && currentPrice > 0) {
+              const change = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice * 100) : 0;
+              const changeColor = change >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+              const changeSign = change >= 0 ? '+' : '';
+              const changeArrow = change >= 0 ? '▲' : '▼';
+              currentPriceHtml = `
+                <div class="token-sub">
+                  Текущая цена: <span style="color: var(--neon-cyan); font-weight: 600;">$${currentPrice.toFixed(8)}</span>
+                  <span style="color: ${changeColor}; margin-left: 0.5rem;">${changeArrow} ${changeSign}${change.toFixed(2)}%</span>
+                </div>
+              `;
+            } else {
+              currentPriceHtml = `
+                <div class="token-sub">
+                  Текущая цена: <span style="color: var(--text-secondary);">Нет данных</span>
+                </div>
+              `;
+            }
+            let openPositionHtml = '';
+            if (t.openPositions && t.openPositions.totalOpenQty > 0) {
+              const openInvested = t.openPositions.totalOpenInvested;
+              const openQty = t.openPositions.totalOpenQty;
+              const potentialProfit = currentPrice && currentPrice > 0 
+                ? (openQty * currentPrice) - openInvested 
+                : 0;
+              const profitColor = potentialProfit >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+              const profitSign = potentialProfit >= 0 ? '+' : '';
+              openPositionHtml = `
+                <div class="token-sub" style="color: var(--neon-yellow); margin-top: 0.25rem;">
+                  ⚠️ Открыто: ${openQty.toLocaleString('en-US')} шт (${formatMoneyPlain(openInvested)})
+                  ${currentPrice && currentPrice > 0 ? ` | Потенциал: <span style="color: ${profitColor};">${profitSign}${formatMoney(potentialProfit)}</span>` : ''}
+                </div>
+              `;
+            }
+            return `
+              <a href="#/token/${encodeURIComponent(t.name)}" class="token-item">
+                <div class="token-info">
+                  <div class="token-icon">${t.name.substring(0, 2)}</div>
+                  <div>
+                    <div class="token-name">${t.name}</div>
+                    <div class="token-sub">Количество: ${parseFloat(t.quantity).toLocaleString('en-US')}</div>
+                    <div class="token-sub">Цена покупки: ${formatPrice(avgPrice)}</div>
+                    ${openPositionHtml}
+                    ${currentPriceHtml}
+                  </div>
+                </div>
+                <div class="token-stats">
+                  <div class="token-value" style="color: ${t.invested > 0 ? 'var(--neon-red)' : 'var(--text-primary)'};">${formatMoneyPlain(t.invested)}</div>
+                </div>
+              </a>
+            `;
+          }).join('') : '<div class="empty-state">Нет купленных токенов</div>'}
+        </div>
+      </section>
+    `;
   };
   const renderTokensView = (searchQuery = '') => {
     const filteredTxs = filterByPeriod(transactions, currentTokenPeriod);
     const allAssets = aggregateTokens(filteredTxs);
     const filtered = searchQuery ? allAssets.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase())) : allAssets;
     const stats = calculateTokenPeriodStats(transactions, currentTokenPeriod);
-    return '<header class="page-header"><h1>Все токены</h1><p>Нажмите для подробной статистики</p></header>' + renderTokenPeriodFilter() + '<section class="stats-grid"><article class="stat-card"><h3>Всего токенов</h3><p class="metric-value">' + stats.totalTokens + '</p></article><article class="stat-card"><h3>Вложено (остаток)</h3><p class="metric-value" style="color: ' + (stats.totalInvested > 0 ? 'var(--neon-red)' : 'var(--text-primary)') + ';">' + formatMoneyPlain(stats.totalInvested) + '</p></article><article class="stat-card"><h3>Общая прибыль</h3><p class="metric-value ' + (stats.totalProfit >= 0 ? 'positive' : 'negative') + '">' + formatMoney(stats.totalProfit) + '</p></article><article class="stat-card"><h3>Всего продано</h3><p class="metric-value positive">' + formatMoneyPlain(stats.totalSold) + '</p></article></section><div class="search-box"><input type="search" id="token-search" placeholder="Поиск..." value="' + searchQuery + '"></div><div class="token-list">' + (filtered.length > 0 ? filtered.map(t => '<a href="#/token/' + encodeURIComponent(t.name) + '" class="token-item"><div class="token-info"><div class="token-icon">' + t.name.substring(0, 2) + '</div><div><div class="token-name">' + t.name + '</div><div class="token-sub">Кол-во: ' + parseFloat(t.quantity).toLocaleString('en-US') + '</div></div></div><div class="token-stats"><div class="token-value" style="color: ' + (t.invested > 0 ? 'var(--neon-red)' : 'var(--text-primary)') + ';">' + formatMoneyPlain(t.invested) + '</div><div class="token-profit ' + (t.profit >= 0 ? 'pos' : 'neg') + '">' + formatMoney(t.profit) + '</div></div></a>').join('') : '<div class="empty-state">Токены не найдены</div>') + '</div>';
+    return `
+      <header class="page-header">
+        <h1>Все токены</h1>
+        <p>Нажмите для подробной статистики</p>
+      </header>
+      ${renderTokenPeriodFilter()}
+      <section class="stats-grid">
+        <article class="stat-card">
+          <h3>Всего токенов</h3>
+          <p class="metric-value">${stats.totalTokens}</p>
+        </article>
+        <article class="stat-card">
+          <h3>Вложено (остаток)</h3>
+          <p class="metric-value" style="color: ${stats.totalInvested > 0 ? 'var(--neon-red)' : 'var(--text-primary)'};">${formatMoneyPlain(stats.totalInvested)}</p>
+        </article>
+        <article class="stat-card">
+          <h3>Общая прибыль</h3>
+          <p class="metric-value ${stats.totalProfit >= 0 ? 'positive' : 'negative'}">${formatMoney(stats.totalProfit)}</p>
+        </article>
+        <article class="stat-card">
+          <h3>Всего продано</h3>
+          <p class="metric-value positive">${formatMoneyPlain(stats.totalSold)}</p>
+        </article>
+      </section>
+      <div class="search-box">
+        <input type="search" id="token-search" placeholder="Поиск..." value="${searchQuery}">
+      </div>
+      <div class="token-list">
+        ${filtered.length > 0 ? filtered.map(t => `
+          <a href="#/token/${encodeURIComponent(t.name)}" class="token-item">
+            <div class="token-info">
+              <div class="token-icon">${t.name.substring(0, 2)}</div>
+              <div>
+                <div class="token-name">${t.name}</div>
+                <div class="token-sub">Кол-во: ${parseFloat(t.quantity).toLocaleString('en-US')}</div>
+              </div>
+            </div>
+            <div class="token-stats">
+              <div class="token-value" style="color: ${t.invested > 0 ? 'var(--neon-red)' : 'var(--text-primary)'};">${formatMoneyPlain(t.invested)}</div>
+              <div class="token-profit ${t.profit >= 0 ? 'pos' : 'neg'}">${formatMoney(t.profit)}</div>
+            </div>
+          </a>
+        `).join('') : '<div class="empty-state">Токены не найдены</div>'}
+      </div>
+    `;
   };
   const renderTokenDetailView = (tokenName) => {
     const name = decodeURIComponent(tokenName).toUpperCase();
     const tokenTxs = transactions.filter(tx => (tx.name || '').toUpperCase() === name && ['buy', 'sell', 'swap', 'bot_token_payout'].includes(tx.type));
     if (tokenTxs.length === 0) {
-      return '<button class="back-btn" onclick="history.back()">← Назад</button><div class="empty-state">Токен не найден</div>';
+      return `<button class="back-btn" onclick="history.back()">← Назад</button><div class="empty-state">Токен не найден</div>`;
     }
     const aggregated = aggregateTokens(tokenTxs)[0];
     const investedDisplay = formatInvested(aggregated);
@@ -693,37 +861,210 @@ document.addEventListener('DOMContentLoaded', () => {
     const profitMonth = calculatePeriodProfit(tokenTxs, 'month');
     const profitYear = calculatePeriodProfit(tokenTxs, 'year');
     const lastBuysHtml = aggregated.lastBuys && aggregated.lastBuys.length > 0 
-      ? aggregated.lastBuys.map((buy) => '<div style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--glass-border); font-size: 0.85rem;"><span style="color: var(--text-secondary);">' + buy.date + '</span><span>' + formatPrice(buy.price) + '</span><span style="color: var(--text-secondary);">' + parseFloat(buy.quantity).toLocaleString('en-US') + '</span></div>').join('')
+      ? aggregated.lastBuys.map((buy) => `
+          <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--glass-border); font-size: 0.85rem;">
+            <span style="color: var(--text-secondary);">${buy.date}</span>
+            <span>${formatPrice(buy.price)}</span>
+            <span style="color: var(--text-secondary);">${parseFloat(buy.quantity).toLocaleString('en-US')}</span>
+          </div>
+        `).join('')
       : '<div style="color: var(--text-secondary); font-size: 0.85rem; padding: 0.5rem 0;">Нет покупок</div>';
-    const botPayoutHtml = aggregated.botPayoutQty > 0 ? '<div class="detail-card" style="border-color: rgba(0, 255, 157, 0.3);"><label>Выведено из ботов</label><div class="value" style="color: var(--neon-green);">' + parseFloat(aggregated.botPayoutQty).toLocaleString('en-US') + '</div><div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">' + (aggregated.botPayoutCount || 0) + ' выплат</div></div>' : '';
+    const botPayoutHtml = aggregated.botPayoutQty > 0 ? `
+      <div class="detail-card" style="border-color: rgba(0, 255, 157, 0.3);">
+        <label>Выведено из ботов</label>
+        <div class="value" style="color: var(--neon-green);">${parseFloat(aggregated.botPayoutQty).toLocaleString('en-US')}</div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">${aggregated.botPayoutCount || 0} выплат</div>
+      </div>
+    ` : '';
     const openPositions = aggregated.openPositions || { openBuys: [], totalOpenQty: 0, totalOpenInvested: 0, avgOpenPrice: 0 };
     const currentPrice = window._currentPrices?.[name] || 0;
-    const currentPriceCardHtml = '<div class="detail-card" style="border-color: ' + (currentPrice > 0 ? 'rgba(0, 243, 255, 0.3)' : 'var(--glass-border)') + ';"><label>Текущий курс</label>' + (currentPrice > 0 ? '<div class="value" style="color: var(--neon-cyan);">$' + currentPrice.toFixed(8) + '</div>' + (aggregated.avgBuyPrice > 0 ? (() => {
-      const change = ((currentPrice - aggregated.avgBuyPrice) / aggregated.avgBuyPrice * 100);
-      const changeColor = change >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
-      const changeSign = change >= 0 ? '+' : '';
-      const changeArrow = change >= 0 ? '▲' : '▼';
-      return '<div style="font-size: 0.8rem; color: ' + changeColor + '; margin-top: 0.25rem;">' + changeArrow + ' ' + changeSign + change.toFixed(2) + '% от средней</div>';
-    })() : '') : '<div class="value" style="color: var(--text-secondary); font-size: 1rem;">Нет данных</div>') + '</div>';
+    const currentPriceCardHtml = `
+      <div class="detail-card" style="border-color: ${currentPrice > 0 ? 'rgba(0, 243, 255, 0.3)' : 'var(--glass-border)'};">
+        <label>Текущий курс</label>
+        ${currentPrice > 0 ? `
+          <div class="value" style="color: var(--neon-cyan);">$${currentPrice.toFixed(8)}</div>
+          ${aggregated.avgBuyPrice > 0 ? (() => {
+            const change = ((currentPrice - aggregated.avgBuyPrice) / aggregated.avgBuyPrice * 100);
+            const changeColor = change >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+            const changeSign = change >= 0 ? '+' : '';
+            const changeArrow = change >= 0 ? '▲' : '▼';
+            return `<div style="font-size: 0.8rem; color: ${changeColor}; margin-top: 0.25rem;">${changeArrow} ${changeSign}${change.toFixed(2)}% от средней</div>`;
+          })() : ''}
+        ` : '<div class="value" style="color: var(--text-secondary); font-size: 1rem;">Нет данных</div>'}
+      </div>
+    `;
     let openPositionsHtml = '';
     if (openPositions.totalOpenQty > 0) {
-      openPositionsHtml = '<div class="detail-card open-positions-card"><label style="color: var(--neon-yellow); font-weight: 600;">📊 Открытые позиции</label><div style="margin-top: 0.75rem;"><div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;"><span style="color: var(--text-secondary); font-size: 0.85rem;">Количество:</span><span style="font-weight: 600;">' + parseFloat(openPositions.totalOpenQty).toLocaleString('en-US') + ' ' + name + '</span></div><div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;"><span style="color: var(--text-secondary); font-size: 0.85rem;">Вложено:</span><span style="font-weight: 600; color: var(--neon-red);">' + formatMoneyPlain(openPositions.totalOpenInvested) + '</span></div></div></div>';
+      openPositionsHtml = `
+        <div class="detail-card open-positions-card">
+          <label style="color: var(--neon-yellow); font-weight: 600;">📊 Открытые позиции</label>
+          <div style="margin-top: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: var(--text-secondary); font-size: 0.85rem;">Количество:</span>
+              <span style="font-weight: 600;">${parseFloat(openPositions.totalOpenQty).toLocaleString('en-US')} ${name}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: var(--text-secondary); font-size: 0.85rem;">Вложено:</span>
+              <span style="font-weight: 600; color: var(--neon-red);">${formatMoneyPlain(openPositions.totalOpenInvested)}</span>
+            </div>
+          </div>
+        </div>
+      `;
     }
     const openBuyIds = new Set(openPositions.openBuys.map(b => b.txId));
-    return '<button class="back-btn" onclick="history.back()">← Назад</button><div class="token-detail-header"><div class="token-icon">' + name.substring(0, 2) + '</div><div><h1>' + name + '</h1><p style="color: var(--text-secondary);">Токен • ' + aggregated.operations.length + ' операций</p></div></div><section class="detail-grid"><div class="detail-card"><label>Вложено (остаток)</label><div class="value" style="color: ' + (aggregated.invested > 0 ? 'var(--neon-cyan)' : 'var(--text-primary)') + ';">' + formatMoneyPlain(aggregated.invested) + '</div></div><div class="detail-card"><label>Прибыль</label><div class="value ' + (aggregated.profit >= 0 ? 'positive' : 'negative') + '">' + formatMoney(aggregated.profit) + '</div></div><div class="detail-card"><label>Последние покупки</label><div style="margin-top: 0.5rem;">' + lastBuysHtml + '</div></div><div class="detail-card"><label>Текущее кол-во</label><div class="value">' + parseFloat(aggregated.quantity).toLocaleString('en-US') + '</div></div>' + currentPriceCardHtml + botPayoutHtml + openPositionsHtml + '</section><section class="section"><div class="section-header"><h2>Чистая прибыль по периодам</h2></div><div class="detail-grid"><div class="detail-card"><label>За 7 дней</label><div class="value ' + (profitWeek >= 0 ? 'positive' : 'negative') + '">' + formatMoney(profitWeek) + '</div></div><div class="detail-card"><label>За 30 дней</label><div class="value ' + (profitMonth >= 0 ? 'positive' : 'negative') + '">' + formatMoney(profitMonth) + '</div></div><div class="detail-card"><label>За год</label><div class="value ' + (profitYear >= 0 ? 'positive' : 'negative') + '">' + formatMoney(profitYear) + '</div></div></div></section><section class="section"><div class="section-header"><h2>История операций</h2></div><div class="tx-list">' + aggregated.operations.sort((a, b) => {
-      const dateA = new Date((b.date || '') + 'T' + (b.time || '00:00'));
-      const dateB = new Date((a.date || '') + 'T' + (a.time || '00:00'));
-      return dateA - dateB;
-    }).map(tx => renderTxItem(tx, openBuyIds)).join('') + '</div></section>';
+    return `
+      <button class="back-btn" onclick="history.back()">← Назад</button>
+      <div class="token-detail-header">
+        <div class="token-icon">${name.substring(0, 2)}</div>
+        <div>
+          <h1>${name}</h1>
+          <p style="color: var(--text-secondary);">Токен • ${aggregated.operations.length} операций</p>
+        </div>
+      </div>
+      <section class="detail-grid">
+        <div class="detail-card">
+          <label>Вложено (остаток)</label>
+          <div class="value" style="color: ${aggregated.invested > 0 ? 'var(--neon-cyan)' : 'var(--text-primary)'};">${formatMoneyPlain(aggregated.invested)}</div>
+        </div>
+        <div class="detail-card">
+          <label>Прибыль</label>
+          <div class="value ${aggregated.profit >= 0 ? 'positive' : 'negative'}">${formatMoney(aggregated.profit)}</div>
+        </div>
+        <div class="detail-card">
+          <label>Последние покупки</label>
+          <div style="margin-top: 0.5rem;">${lastBuysHtml}</div>
+        </div>
+        <div class="detail-card">
+          <label>Текущее кол-во</label>
+          <div class="value">${parseFloat(aggregated.quantity).toLocaleString('en-US')}</div>
+        </div>
+        ${currentPriceCardHtml}
+        ${botPayoutHtml}
+        ${openPositionsHtml}
+      </section>
+      <section class="section">
+        <div class="section-header"><h2>Чистая прибыль по периодам</h2></div>
+        <div class="detail-grid">
+          <div class="detail-card">
+            <label>За 7 дней</label>
+            <div class="value ${profitWeek >= 0 ? 'positive' : 'negative'}">${formatMoney(profitWeek)}</div>
+          </div>
+          <div class="detail-card">
+            <label>За 30 дней</label>
+            <div class="value ${profitMonth >= 0 ? 'positive' : 'negative'}">${formatMoney(profitMonth)}</div>
+          </div>
+          <div class="detail-card">
+            <label>За год</label>
+            <div class="value ${profitYear >= 0 ? 'positive' : 'negative'}">${formatMoney(profitYear)}</div>
+          </div>
+        </div>
+      </section>
+      <section class="section">
+        <div class="section-header"><h2>История операций</h2></div>
+        <div class="tx-list">
+          ${aggregated.operations.sort((a, b) => {
+            const dateA = new Date((b.date || '') + 'T' + (b.time || '00:00'));
+            const dateB = new Date((a.date || '') + 'T' + (a.time || '00:00'));
+            return dateA - dateB;
+          }).map(tx => renderTxItem(tx, openBuyIds)).join('')}
+        </div>
+      </section>
+    `;
   };
   const renderTradingView = () => {
     const allAssets = aggregateTokens(transactions);
-    return '<header class="page-header"><h1>Трейдинг</h1><p>Покупки, продажи и обмены</p></header><div class="token-list">' + (allAssets.length > 0 ? allAssets.map(t => '<a href="#/token/' + encodeURIComponent(t.name) + '" class="token-item"><div class="token-info"><div class="token-icon">' + t.name.substring(0, 2) + '</div><div><div class="token-name">' + t.name + '</div><div class="token-sub">' + t.buyCount + ' покупок • ' + t.sellCount + ' продаж</div></div></div><div class="token-stats"><div class="token-value" style="color: ' + (t.invested > 0 ? 'var(--neon-red)' : 'var(--text-primary)') + ';">' + formatMoneyPlain(t.invested) + '</div><div class="token-profit ' + (t.profit >= 0 ? 'pos' : 'neg') + '">' + formatMoney(t.profit) + '</div></div></a>').join('') : '<div class="empty-state">Нет сделок</div>') + '</div>';
+    return `
+      <header class="page-header">
+        <h1>Трейдинг</h1>
+        <p>Покупки, продажи и обмены</p>
+      </header>
+      <div class="token-list">
+        ${allAssets.length > 0 ? allAssets.map(t => `
+          <a href="#/token/${encodeURIComponent(t.name)}" class="token-item">
+            <div class="token-info">
+              <div class="token-icon">${t.name.substring(0, 2)}</div>
+              <div>
+                <div class="token-name">${t.name}</div>
+                <div class="token-sub">${t.buyCount} покупок • ${t.sellCount} продаж</div>
+              </div>
+            </div>
+            <div class="token-stats">
+              <div class="token-value" style="color: ${t.invested > 0 ? 'var(--neon-red)' : 'var(--text-primary)'};">${formatMoneyPlain(t.invested)}</div>
+              <div class="token-profit ${t.profit >= 0 ? 'pos' : 'neg'}">${formatMoney(t.profit)}</div>
+            </div>
+          </a>
+        `).join('') : '<div class="empty-state">Нет сделок</div>'}
+      </div>
+    `;
   };
   const renderSettingsView = () => {
     const customTypes = operationTypes.filter(t => !t.default);
     const defaultTypesList = operationTypes.filter(t => t.default);
-    return '<header class="page-header"><h1>Настройки</h1><p>Управление данными</p></header><section class="section"><div class="stat-card"><h2>Типы операций</h2><div class="add-type-form"><h3>Добавить новый тип</h3><div class="form-row"><div class="form-group"><label>Ключ (латиницей)</label><input type="text" id="new-type-key" class="form-input" placeholder="gift"></div><div class="form-group"><label>Название</label><input type="text" id="new-type-label" class="form-input" placeholder="Подарок"></div></div><button class="submit-btn" id="add-type-btn">Добавить</button></div><h3>Стандартные типы</h3><div class="type-list">' + defaultTypesList.map(t => '<div class="type-item"><div class="type-item-info"><span class="type-item-key">' + t.key + '</span><span>' + t.label + '</span></div><span style="font-size: 0.75rem; color: var(--text-secondary);">стандартный</span></div>').join('') + '</div>' + (customTypes.length > 0 ? '<h3>Мои типы</h3><div class="type-list">' + customTypes.map(t => '<div class="type-item"><div class="type-item-info"><span class="type-item-key">' + t.key + '</span><span>' + t.label + '</span></div><div class="type-item-actions"><button class="edit-type-btn" data-key="' + t.key + '">✏️</button><button class="danger delete-type-btn" data-key="' + t.key + '">🗑️</button></div></div>').join('') + '</div>' : '') + '</div></section><section class="section"><div class="stat-card"><h3>Экспорт данных</h3><button class="submit-btn" id="export-btn-inline">📦 Скачать JSON</button></div><div class="stat-card"><h3>Статистика</h3><p>Операций: <strong>' + transactions.length + '</strong></p><p>Типов: <strong>' + operationTypes.length + '</strong></p></div></section>';
+    return `
+      <header class="page-header">
+        <h1>Настройки</h1>
+        <p>Управление данными</p>
+      </header>
+      <section class="section">
+        <div class="stat-card">
+          <h2>Типы операций</h2>
+          <div class="add-type-form">
+            <h3>Добавить новый тип</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Ключ (латиницей)</label>
+                <input type="text" id="new-type-key" class="form-input" placeholder="gift">
+              </div>
+              <div class="form-group">
+                <label>Название</label>
+                <input type="text" id="new-type-label" class="form-input" placeholder="Подарок">
+              </div>
+            </div>
+            <button class="submit-btn" id="add-type-btn">Добавить</button>
+          </div>
+          <h3>Стандартные типы</h3>
+          <div class="type-list">
+            ${defaultTypesList.map(t => `
+              <div class="type-item">
+                <div class="type-item-info">
+                  <span class="type-item-key">${t.key}</span>
+                  <span>${t.label}</span>
+                </div>
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">стандартный</span>
+              </div>
+            `).join('')}
+          </div>
+          ${customTypes.length > 0 ? `
+            <h3>Мои типы</h3>
+            <div class="type-list">
+              ${customTypes.map(t => `
+                <div class="type-item">
+                  <div class="type-item-info">
+                    <span class="type-item-key">${t.key}</span>
+                    <span>${t.label}</span>
+                  </div>
+                  <div class="type-item-actions">
+                    <button class="edit-type-btn" data-key="${t.key}">✏️</button>
+                    <button class="danger delete-type-btn" data-key="${t.key}">🗑️</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      </section>
+      <section class="section">
+        <div class="stat-card">
+          <h3>Экспорт данных</h3>
+          <button class="submit-btn" id="export-btn-inline">📦 Скачать JSON</button>
+        </div>
+        <div class="stat-card">
+          <h3>Статистика</h3>
+          <p>Операций: <strong>${transactions.length}</strong></p>
+          <p>Типов: <strong>${operationTypes.length}</strong></p>
+        </div>
+      </section>
+    `;
   };
   Router.register('#/portfolio', async () => {
     await updateTokenPrices();
@@ -901,7 +1242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'cryptovibe-backup-' + new Date().toISOString().split('T')[0] + '.json';
+    a.download = `cryptovibe-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -987,7 +1328,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const init = async () => {
     try {
-      // Проверка авторизации Firebase
+      // ПРОВЕРКА АВТОРИЗАЦИИ FIREBASE (ДОБАВЛЕНО)
       if (typeof FirebaseClient !== 'undefined') {
         await FirebaseClient.init();
         await new Promise(resolve => FirebaseClient.onAuthReady(() => resolve()));
@@ -1000,13 +1341,13 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
         
-        // Миграция токенов
+        // МИГРАЦИЯ ТОКЕНОВ (ДОБАВЛЕНО)
         if (FirebaseClient.isAuthenticated()) {
           console.log('🔄 Миграция токенов...');
           await FirebaseClient.migrateTokensFromLocalStorage();
         }
       }
-      
+
       let storedTypes = await DB.getTypes();
       if (storedTypes.length === 0) {
         for (const t of defaultTypes) await DB.addType(t);
