@@ -49,7 +49,6 @@ const StonAPI = {
       const pairs = data.pairs || [];
       if (pairs.length === 0) return null;
       
-      // Ищем пару с USDT или TON
       let bestPair = null;
       for (const pair of pairs) {
         if (pair.chainId === 'ton') {
@@ -72,7 +71,6 @@ const StonAPI = {
             price: priceUsd,
             dex: bestPair.dexId || 'dexscreener',
             poolName: `${bestPair.baseToken?.symbol}/${bestPair.quoteToken?.symbol}` || '',
-            tokenName: bestPair.baseToken?.symbol || null, // ✅ НОВОЕ ПОЛЕ
             priceChange24h: parseFloat(bestPair.priceChange?.h24 || '0'),
             source: 'DexScreener'
           };
@@ -88,16 +86,13 @@ const StonAPI = {
     const addr = tokenAddress.trim();
     const cacheKey = addr + ':USD';
     
-    // Проверяем кэш
     const memCached = this._cache.get(cacheKey);
     if (memCached && (Date.now() - memCached.timestamp) < this.CACHE_TTL) {
       return memCached;
     }
     
-    // Получаем цену
     let result = await this._fetchDexScreener(addr);
     
-    // Если не получилось — берём из кэша
     if (!result || result.price <= 0) {
       const lastKnown = this.getLastKnownPrice(addr);
       if (lastKnown) {
@@ -122,12 +117,10 @@ const StonAPI = {
       dex: result.dex || 'unknown',
       priceChange24h: result.priceChange24h || 0,
       poolName: result.poolName || '',
-      tokenName: result.tokenName || null, // ✅ НОВОЕ ПОЛЕ
       source: result.source || 'unknown',
       fromStorage: result.fromStorage || false
     };
     
-    // Сохраняем в кэш
     if (finalResult.available) {
       this._cache.set(cacheKey, finalResult);
       const storage = this._loadFromStorage();
@@ -135,7 +128,6 @@ const StonAPI = {
         price: finalResult.price,
         dex: finalResult.dex,
         poolName: finalResult.poolName,
-        tokenName: finalResult.tokenName, // ✅ НОВОЕ ПОЛЕ
         priceChange24h: finalResult.priceChange24h,
         source: finalResult.source,
         timestamp: Date.now()
