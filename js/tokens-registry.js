@@ -5,7 +5,6 @@ const TokensRegistry = {
   useFirebase: false,
   initialized: false,
 
-  // Вызывается один раз при загрузке приложения
   async init() {
     if (this.initialized) return;
     
