@@ -1,15 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Trading App: загрузка...');
   
-  // Экран ожидания авторизации
-  document.body.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0a0a12;color:#fff;font-family:system-ui;">
-      <div style="font-size:3rem;margin-bottom:1rem;animation:pulse 1.5s infinite;">⏳</div>
-      <div style="font-size:1.2rem;">Проверка авторизации...</div>
-      <style>@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }</style>
-    </div>
-  `;
-
   let trades = [], plans = [], diaryEntries = [];
   let editingTradeId = null, editingPlanId = null, editingDiaryId = null;
   let initialDeposit = 0, availableTokens = [], availableTags = [];
@@ -29,7 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     { value: 9, emoji: '🤩', label: 'Супер' }, { value: 10, emoji: '🚀', label: 'Максимум!' }
   ];
 
-  // Индикатор авторизации в правом верхнем углу
+  // Индикатор авторизации
   function renderAuthBadge() {
     const isAuth = typeof FirebaseClient !== 'undefined' && FirebaseClient.isAuthenticated();
     const email = isAuth ? FirebaseClient.getCurrentUser()?.email : 'Гостевой режим';
@@ -62,7 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       
       if (FirebaseClient.isAuthenticated()) {
-        console.log('🔄 Проверяем миграцию токенов...');
+        console.log('🔄 Миграция токенов...');
         await FirebaseClient.migrateTokensFromLocalStorage();
       }
     }
@@ -84,77 +75,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       Notifications.startPeriodicCheck();
     }
     
-    // Восстанавливаем интерфейс
-    document.body.innerHTML = `
-      <nav class="top-nav">
-        <div class="logo">Crypto<span>Vibe</span></div>
-        <div class="nav-links">
-          <a href="#journal">Журнал</a>
-          <a href="#plans">Планы</a>
-          <a href="#diary">Дневник</a>
-          <a href="#stats">Статистика</a>
-          <a href="#calculators">Калькуляторы</a>
-          <a href="#settings">Настройки</a>
-        </div>
-      </nav>
-      <main id="main-content" style="padding-top: 80px;"></main>
-      <dialog id="trade-modal">
-        <div class="modal-header">
-          <h2 id="modal-title">Новая запись</h2>
-          <button class="close-btn" id="close-modal">&times;</button>
-        </div>
-        <form id="trade-form" class="modal-body">
-          <div class="form-row">
-            <div class="form-group"><label>Дата</label><input type="date" id="trade-date" class="form-input" required></div>
-            <div class="form-group"><label>Время</label><input type="time" id="trade-time" class="form-input" required></div>
-          </div>
-          <div class="form-group"><label>Токен</label><input type="text" id="trade-token" class="form-input" placeholder="BTC, ETH..." required autocomplete="off"></div>
-          <div class="form-row">
-            <div class="form-group"><label>Цена входа ($)</label><input type="number" id="trade-entry" class="form-input" step="any" required></div>
-            <div class="form-group"><label>Цена выхода ($)</label><input type="number" id="trade-exit" class="form-input" step="any" required></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label>Stop Loss ($)</label><input type="number" id="trade-sl" class="form-input" step="any"></div>
-            <div class="form-group"><label>Количество</label><input type="number" id="trade-quantity" class="form-input" step="any" required></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label>Комиссия ($)</label><input type="number" id="trade-fee" class="form-input" step="any" value="0"></div>
-            <div class="form-group"><label>Риск (%)</label><input type="number" id="trade-risk" class="form-input" step="any" value="2"></div>
-          </div>
-          <div class="form-group">
-            <label>Теги</label>
-            <input type="text" id="trade-tags-input" class="form-input" placeholder="Введите тег и нажмите Enter">
-            <div id="tag-suggestions" class="tag-suggestions" style="display:none;"></div>
-            <div id="selected-tags" class="selected-tags-container"></div>
-          </div>
-          <div class="form-group"><label>Заметки</label><textarea id="trade-notes" class="form-input" rows="3"></textarea></div>
-          <button type="submit" class="submit-btn" style="width:100%;margin-top:1rem;">Сохранить</button>
-        </form>
-      </dialog>
-    `;
-    
-    if (!document.querySelector('style#nav-styles')) {
-      const style = document.createElement('style');
-      style.id = 'nav-styles';
-      style.textContent = `
-        .top-nav { position: fixed; top: 0; left: 0; right: 0; height: 60px; background: rgba(10,10,18,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; z-index: 1000; }
-        .logo { font-size: 1.5rem; font-weight: 700; color: #fff; }
-        .logo span { color: #00f3ff; }
-        .nav-links { display: flex; gap: 1.5rem; }
-        .nav-links a { color: #a0a0b0; text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
-        .nav-links a:hover, .nav-links a.active { color: #00f3ff; }
-        @media (max-width: 768px) { .top-nav { flex-direction: column; height: auto; padding: 1rem; } .nav-links { flex-wrap: wrap; justify-content: center; gap: 1rem; margin-top: 0.5rem; } }
-      `;
-      document.head.appendChild(style);
-    }
-
     handleNavigation();
     window.addEventListener('hashchange', handleNavigation);
     renderAuthBadge();
-    console.log('✅ Приложение готово');
+    console.log('Приложение готово');
   } catch (err) {
     console.error('Ошибка:', err);
-    document.body.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ff0055;"><h2>Ошибка загрузки</h2><p>'+err.message+'</p></div>';
+    document.getElementById('main-content').innerHTML = '<div style="padding: 2rem; text-align: center;"><h2 style="color: var(--neon-red);">Ошибка</h2><p>'+err.message+'</p></div>';
   }
 
   document.getElementById('close-modal').addEventListener('click', () => document.getElementById('trade-modal').close());
