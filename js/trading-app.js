@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     { value: 9, emoji: '🤩', label: 'Супер' }, { value: 10, emoji: '🚀', label: 'Максимум!' }
   ];
 
-  // Индикатор авторизации
   function renderAuthBadge() {
     const isAuth = typeof FirebaseClient !== 'undefined' && FirebaseClient.isAuthenticated();
     const email = isAuth ? FirebaseClient.getCurrentUser()?.email : 'Гостевой режим';
@@ -161,7 +160,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (confirm('Удалить тег "'+tag+'"?')) {
         availableTags = availableTags.filter(x => x !== tag);
         await TradingDB.saveSetting('availableTags', availableTags);
-        for (const tr of trades) { if (tr.tags?.includes(tag)) { tr.tags = tr.tags.filter(x => x !== tag); await TradingDB.update(tr); } }
+        for (const tr of trades) { if (tr.tags && tr.tags.includes(tag)) { tr.tags = tr.tags.filter(x => x !== tag); await TradingDB.update(tr); } }
         trades = await TradingDB.getAll(); renderSettings();
       }
       return;
@@ -208,21 +207,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (c) f = f.filter(t => new Date(t.date + 'T' + (t.time || '00:00')) >= c);
     if (tag && tag !== 'all') {
       const tagLower = tag.toLowerCase();
-      f = f.filter(t => t.tags?.some(x => x.toLowerCase() === tagLower));
+      f = f.filter(t => t.tags && t.tags.some(x => x.toLowerCase() === tagLower));
     }
     return f;
   }
   
   function renderPeriodFilter() {
-    return '<div class="period-filter">'+[{k:'week',l:'7 дней'},{k:'month',l:'30 дней'},{k:'year',l:'Год'},{k:'all',l:'Всё время'}].map(p => '<button class="period-btn '+(currentPeriod===p.k?'active':'')+'" data-period="'+p.k+'">'+p.l+'</button>').join('')+'</div>';
+    const periods = [{k:'week',l:'7 дней'},{k:'month',l:'30 дней'},{k:'year',l:'Год'},{k:'all',l:'Всё время'}];
+    let html = '<div class="period-filter">';
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i];
+      html += '<button class="period-btn '+(currentPeriod===p.k?'active':'')+'" data-period="'+p.k+'">'+p.l+'</button>';
+    }
+    html += '</div>';
+    return html;
   }
   
   function renderTagFilter() {
-    return '<div class="tag-filter"><span style="font-size:0.85rem;color:var(--text-secondary);margin-right:0.5rem;">Теги:</span>'+['all',...availableTags].map(t => {
+    const allTags = ['all'].concat(availableTags);
+    let html = '<div class="tag-filter"><span style="font-size:0.85rem;color:var(--text-secondary);margin-right:0.5rem;">Теги:</span>';
+    for (let i = 0; i < allTags.length; i++) {
+      const t = allTags[i];
       const tagLower = t.toLowerCase();
       const filterLower = currentTagFilter.toLowerCase();
-      return '<button class="tag-filter-btn '+(filterLower===tagLower?'active':'')+'" data-tag="'+t+'">'+(t==='all'?'Все':t)+'</button>';
-    }).join('')+'</div>';
+      html += '<button class="tag-filter-btn '+(filterLower===tagLower?'active':'')+'" data-tag="'+t+'">'+(t==='all'?'Все':t)+'</button>';
+    }
+    html += '</div>';
+    return html;
   }
 
   function handleNavigation() {
@@ -243,10 +254,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof TokensRegistry !== 'undefined') {
       try { const t = await TokensRegistry.getAll(); availableTokens = t.map(x => x.name.toUpperCase()); } catch(e){}
     }
-    trades.forEach(t => { if (t.token && !availableTokens.includes(t.token.toUpperCase())) availableTokens.push(t.token.toUpperCase()); });
+    for (let i = 0; i < trades.length; i++) {
+      const t = trades[i];
+      if (t.token && !availableTokens.includes(t.token.toUpperCase())) availableTokens.push(t.token.toUpperCase());
+    }
     availableTokens.sort();
     setupAutocomplete();
   }
+  
   function setupAutocomplete() {
     const inp = document.getElementById('trade-token');
     if (!inp) return;
@@ -264,7 +279,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (v.length < 1) { list.style.display='none'; return; }
         const m = availableTokens.filter(t => t.includes(v)).slice(0,10);
         if (m.length === 0) { list.style.display='none'; return; }
-        list.innerHTML = m.map(t => '<div class="autocomplete-item" data-value="'+t+'">'+t+'</div>').join('');
+        let inner = '';
+        for (let i = 0; i < m.length; i++) {
+          inner += '<div class="autocomplete-item" data-value="'+m[i]+'">'+m[i]+'</div>';
+        }
+        list.innerHTML = inner;
         list.style.display = 'block';
       }, 100);
     });
@@ -280,14 +299,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (val.length < 1) { el.style.display = 'none'; return; }
     const m = availableTags.filter(t => t.toLowerCase().includes(val) && !selectedTags.some(s => s.toLowerCase() === t.toLowerCase())).slice(0,5);
     if (m.length === 0) { el.innerHTML = '<div class="tag-suggestion-item" id="add-custom-tag-btn">+ Создать "'+val+'"</div>'; el.style.display = 'block'; return; }
-    el.innerHTML = m.map(t => '<div class="tag-suggestion-item" data-tag="'+t+'">'+t+'</div>').join('');
+    let inner = '';
+    for (let i = 0; i < m.length; i++) {
+      inner += '<div class="tag-suggestion-item" data-tag="'+m[i]+'">'+m[i]+'</div>';
+    }
+    el.innerHTML = inner;
     el.style.display = 'block';
   }
+  
   function renderSelectedTags() {
     const c = document.getElementById('selected-tags');
     if (!c) return;
-    c.innerHTML = selectedTags.length === 0 ? '' : selectedTags.map(t => '<span class="selected-tag">'+t+'<span class="remove-tag remove-tag-btn" data-tag="'+t+'">&times;</span></span>').join('');
+    if (selectedTags.length === 0) { c.innerHTML = ''; return; }
+    let html = '';
+    for (let i = 0; i < selectedTags.length; i++) {
+      const t = selectedTags[i];
+      html += '<span class="selected-tag">'+t+'<span class="remove-tag remove-tag-btn" data-tag="'+t+'">&times;</span></span>';
+    }
+    c.innerHTML = html;
   }
+  
   function getTagClass(t) {
     const l = t.toLowerCase();
     if (l.includes('скальп')) return 'tag-scalp';
@@ -297,46 +328,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (l.includes('fomo')) return 'tag-signal';
     return 'tag-custom';
   }
+  
   function renderTags(tags) {
-    if (!tags?.length) return '';
-    return tags.map(t => '<span class="tag '+getTagClass(t)+'">'+t+'</span>').join('');
+    if (!tags || tags.length === 0) return '';
+    let html = '';
+    for (let i = 0; i < tags.length; i++) {
+      html += '<span class="tag '+getTagClass(tags[i])+'">'+tags[i]+'</span>';
+    }
+    return html;
   }
 
   function renderJournal() {
     const f = filterTrades(trades, currentPeriod, currentTagFilter);
     const s = TradingStats.calculate(f, initialDeposit);
     const c = document.createElement('div');
-    c.innerHTML = renderPeriodFilter()+renderTagFilter()+
-      '<section class="stats-grid">'+
-        '<div class="stat-card"><h3>Баланс</h3><div class="stat-value neutral">$'+s.currentBalance.toFixed(2)+'</div></div>'+
-        '<div class="stat-card"><h3>Прибыль</h3><div class="stat-value '+(s.netProfit>=0?'positive':'negative')+'">'+TradingStats.formatMoney(s.netProfit)+'</div></div>'+
-        '<div class="stat-card"><h3>Win Rate</h3><div class="stat-value neutral">'+TradingStats.formatPercent(s.winRate)+'</div></div>'+
-        '<div class="stat-card"><h3>Profit Factor</h3><div class="stat-value neutral">'+s.profitFactor.toFixed(2)+'</div></div>'+
-        '<div class="stat-card"><h3>Сделок</h3><div class="stat-value neutral">'+s.totalTrades+'</div></div>'+
-        '<div class="stat-card"><h3>Приб/Убыт</h3><div class="stat-value"><span style="color:var(--neon-green);">'+s.winningTrades+'</span>/<span style="color:var(--neon-red);">'+s.losingTrades+'</span></div></div>'+
-      '</section>'+
-      '<section class="section">'+
-        '<div class="section-header"><h2>Журнал сделок '+(currentPeriod!=='all'||currentTagFilter!=='all'?'<span style="color:var(--text-secondary);font-size:0.9rem;font-weight:400;">(фильтр)</span>':'')+'</h2>'+
-        '<button class="btn" id="add-trade-btn">+ Сделка</button></div>'+
-        '<div class="trades-table">'+(f.length>0?renderTradesTable(f):'<div class="empty-state">Нет сделок</div>')+'</div>'+
-      '</section>';
+    let html = renderPeriodFilter() + renderTagFilter();
+    html += '<section class="stats-grid">';
+    html += '<div class="stat-card"><h3>Баланс</h3><div class="stat-value neutral">$'+s.currentBalance.toFixed(2)+'</div></div>';
+    html += '<div class="stat-card"><h3>Прибыль</h3><div class="stat-value '+(s.netProfit>=0?'positive':'negative')+'">'+TradingStats.formatMoney(s.netProfit)+'</div></div>';
+    html += '<div class="stat-card"><h3>Win Rate</h3><div class="stat-value neutral">'+TradingStats.formatPercent(s.winRate)+'</div></div>';
+    html += '<div class="stat-card"><h3>Profit Factor</h3><div class="stat-value neutral">'+s.profitFactor.toFixed(2)+'</div></div>';
+    html += '<div class="stat-card"><h3>Сделок</h3><div class="stat-value neutral">'+s.totalTrades+'</div></div>';
+    html += '<div class="stat-card"><h3>Приб/Убыт</h3><div class="stat-value"><span style="color:var(--neon-green);">'+s.winningTrades+'</span>/<span style="color:var(--neon-red);">'+s.losingTrades+'</span></div></div>';
+    html += '</section>';
+    html += '<section class="section">';
+    const filterLabel = (currentPeriod!=='all' || currentTagFilter!=='all') ? '<span style="color:var(--text-secondary);font-size:0.9rem;font-weight:400;">(фильтр)</span>' : '';
+    html += '<div class="section-header"><h2>Журнал сделок '+filterLabel+'</h2>';
+    html += '<button class="btn" id="add-trade-btn">+ Сделка</button></div>';
+    if (f.length > 0) {
+      html += '<div class="trades-table">' + renderTradesTable(f) + '</div>';
+    } else {
+      html += '<div class="trades-table"><div class="empty-state">Нет сделок</div></div>';
+    }
+    html += '</section>';
+    c.innerHTML = html;
     const main = document.getElementById('main-content');
     main.innerHTML = ''; main.appendChild(c);
   }
+  
   function renderTradesTable(list) {
     const s = [...list].sort((a,b) => new Date(b.date+'T'+b.time)-new Date(a.date+'T'+a.time));
     let h = '<div class="trade-row header"><div>Дата</div><div>Токен</div><div>Вход/Выход</div><div>Кол-во</div><div>Комиссия</div><div>P&L</div><div></div></div>';
-    for (const t of s) {
-      const pnl = TradingStats.calculatePnL(t), cls = pnl>=0?'positive':'negative';
-      h += '<div class="trade-row">'+
-        '<div class="trade-date">'+t.date+' '+t.time+'</div>'+
-        '<div><div class="trade-token">'+t.token+'</div>'+(renderTags(t.tags)?'<div style="margin-top:0.3rem;">'+renderTags(t.tags)+'</div>':'')+'</div>'+
-        '<div><div>$'+parseFloat(t.entryPrice).toFixed(6)+'</div><div>$'+parseFloat(t.exitPrice).toFixed(6)+'</div></div>'+
-        '<div>'+parseFloat(t.quantity).toLocaleString()+'</div>'+
-        '<div>$'+parseFloat(t.fee||0).toFixed(2)+'</div>'+
-        '<div class="trade-pnl '+cls+'">'+TradingStats.formatMoney(pnl)+'</div>'+
-        '<div class="trade-actions"><button class="edit-trade" data-id="'+t.id+'">✏️</button><button class="delete-trade" data-id="'+t.id+'">🗑️</button></div>'+
-      '</div>';
+    for (let i = 0; i < s.length; i++) {
+      const t = s[i];
+      const pnl = TradingStats.calculatePnL(t);
+      const cls = pnl >= 0 ? 'positive' : 'negative';
+      const tagsHtml = renderTags(t.tags);
+      h += '<div class="trade-row">';
+      h += '<div class="trade-date">'+t.date+' '+t.time+'</div>';
+      h += '<div><div class="trade-token">'+t.token+'</div>';
+      if (tagsHtml) h += '<div style="margin-top:0.3rem;">'+tagsHtml+'</div>';
+      h += '</div>';
+      h += '<div><div>$'+parseFloat(t.entryPrice).toFixed(6)+'</div><div>$'+parseFloat(t.exitPrice).toFixed(6)+'</div></div>';
+      h += '<div>'+parseFloat(t.quantity).toLocaleString()+'</div>';
+      h += '<div>$'+parseFloat(t.fee||0).toFixed(2)+'</div>';
+      h += '<div class="trade-pnl '+cls+'">'+TradingStats.formatMoney(pnl)+'</div>';
+      h += '<div class="trade-actions"><button class="edit-trade" data-id="'+t.id+'">✏️</button><button class="delete-trade" data-id="'+t.id+'">🗑️</button></div>';
+      h += '</div>';
     }
     return h;
   }
@@ -350,65 +398,88 @@ document.addEventListener('DOMContentLoaded', async () => {
     const followed = completed.filter(p => p.followedPlan===true);
     const pwr = completed.length>0 ? (completed.filter(p=>p.actualPnL>0).length/completed.length*100) : 0;
     const pfr = completed.length>0 ? (followed.length/completed.length*100) : 0;
-    c.innerHTML = '<section class="section">'+
-      '<div class="section-header"><h2>📋 Планировщик</h2><button class="btn" id="add-plan-btn">+ Новый план</button></div>'+
-      '<div class="stats-grid" style="margin-bottom:1.5rem;">'+
-        '<div class="stat-card"><h3>Активных</h3><div class="stat-value neutral">'+plans.filter(p=>p.status==='pending').length+'</div></div>'+
-        '<div class="stat-card"><h3>Завершено</h3><div class="stat-value positive">'+completed.length+'</div></div>'+
-        '<div class="stat-card"><h3>Win Rate</h3><div class="stat-value neutral">'+pwr.toFixed(0)+'%</div></div>'+
-        '<div class="stat-card"><h3>Соблюдение</h3><div class="stat-value '+(pfr>=70?'positive':'negative')+'">'+pfr.toFixed(0)+'%</div></div>'+
-      '</div>'+
-      '<div class="period-filter">'+filters.map(x=>'<button class="period-btn plan-filter-btn '+(currentPlanFilter===x.k?'active':'')+'" data-filter="'+x.k+'">'+x.l+'</button>').join('')+'</div>'+
-      (sorted.length>0?sorted.map(p=>renderPlanCard(p)).join(''):'<div class="empty-state">Нет планов</div>')+
-    '</section>';
+    
+    let html = '<section class="section">';
+    html += '<div class="section-header"><h2>📋 Планировщик</h2><button class="btn" id="add-plan-btn">+ Новый план</button></div>';
+    html += '<div class="stats-grid" style="margin-bottom:1.5rem;">';
+    html += '<div class="stat-card"><h3>Активных</h3><div class="stat-value neutral">'+plans.filter(p=>p.status==='pending').length+'</div></div>';
+    html += '<div class="stat-card"><h3>Завершено</h3><div class="stat-value positive">'+completed.length+'</div></div>';
+    html += '<div class="stat-card"><h3>Win Rate</h3><div class="stat-value neutral">'+pwr.toFixed(0)+'%</div></div>';
+    html += '<div class="stat-card"><h3>Соблюдение</h3><div class="stat-value '+(pfr>=70?'positive':'negative')+'">'+pfr.toFixed(0)+'%</div></div>';
+    html += '</div>';
+    html += '<div class="period-filter">';
+    for (let i = 0; i < filters.length; i++) {
+      const x = filters[i];
+      html += '<button class="period-btn plan-filter-btn '+(currentPlanFilter===x.k?'active':'')+'" data-filter="'+x.k+'">'+x.l+'</button>';
+    }
+    html += '</div>';
+    if (sorted.length > 0) {
+      for (let i = 0; i < sorted.length; i++) {
+        html += renderPlanCard(sorted[i]);
+      }
+    } else {
+      html += '<div class="empty-state">Нет планов</div>';
+    }
+    html += '</section>';
+    c.innerHTML = html;
     const main = document.getElementById('main-content');
     main.innerHTML = ''; main.appendChild(c);
   }
+  
   function renderPlanCard(p) {
     const labels = {pending:'Ожидает',completed:'Завершён',cancelled:'Отменён'};
     const rr = Math.abs(p.plannedEntry-p.plannedSL)>0 ? Math.abs(p.plannedTP-p.plannedEntry)/Math.abs(p.plannedEntry-p.plannedSL) : 0;
     const plannedPnL = (p.plannedTP-p.plannedEntry)*p.positionSize;
     const fLabels = {true:'✅ Да',false:'❌ Нет',partial:'⚠️ Частично'};
-    return '<div class="plan-card plan-'+p.status+'">'+
-      '<div class="plan-header">'+
-        '<div><span class="plan-title">'+p.token+'</span><span style="margin-left:0.5rem;color:var(--text-secondary);font-size:0.85rem;">'+(p.direction==='long'?'📈 Лонг':'📉 Шорт')+'</span></div>'+
-        '<div style="display:flex;gap:0.5rem;align-items:center;">'+
-          '<span class="plan-status '+p.status+'">'+labels[p.status]+'</span>'+
-          '<button class="edit-plan" data-id="'+p.id+'" style="background:var(--bg-input);border:var(--glass-border);border-radius:6px;padding:0.4rem 0.6rem;cursor:pointer;color:var(--text-secondary);">✏️</button>'+
-          '<button class="delete-plan" data-id="'+p.id+'" style="background:var(--bg-input);border:var(--glass-border);border-radius:6px;padding:0.4rem 0.6rem;cursor:pointer;color:var(--text-secondary);">🗑️</button>'+
-        '</div>'+
-      '</div>'+
-      '<div class="plan-grid">'+
-        '<div class="plan-item"><div class="plan-item-label">Вход</div><div class="plan-item-value neutral">$'+parseFloat(p.plannedEntry).toFixed(6)+'</div></div>'+
-        '<div class="plan-item"><div class="plan-item-label">Stop Loss</div><div class="plan-item-value negative">$'+parseFloat(p.plannedSL).toFixed(6)+'</div></div>'+
-        '<div class="plan-item"><div class="plan-item-label">Take Profit</div><div class="plan-item-value positive">$'+parseFloat(p.plannedTP).toFixed(6)+'</div></div>'+
-        '<div class="plan-item"><div class="plan-item-label">Размер</div><div class="plan-item-value">'+parseFloat(p.positionSize).toLocaleString()+'</div></div>'+
-        '<div class="plan-item"><div class="plan-item-label">Риск</div><div class="plan-item-value warning">'+p.riskPercent+'%</div></div>'+
-        '<div class="plan-item"><div class="plan-item-label">R:R</div><div class="plan-item-value neutral">1:'+rr.toFixed(2)+'</div></div>'+
-      '</div>'+
-      (p.reason?'<div style="margin-bottom:0.75rem;"><span style="font-size:0.85rem;color:var(--text-secondary);">Причина:</span> <span style="font-size:0.9rem;">'+p.reason+'</span></div>':'')+
-      (p.checklist?.length?'<div style="margin-bottom:0.75rem;"><div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem;">Чек-лист:</div>'+p.checklist.map(i=>'<div class="checklist-item"><input type="checkbox" '+(i.checked?'checked':'')+' disabled><span style="'+(i.checked?'color:var(--neon-green);':'color:var(--text-secondary);')+'">'+i.text+'</span></div>').join('')+'</div>':'')+
-      (p.status==='pending'?'<button class="btn complete-plan" data-id="'+p.id+'" style="margin-top:0.5rem;">✓ Закрыть план</button>':'')+
-      (p.status==='completed'?
-        '<div class="plan-comparison">'+
-          '<div class="plan-comparison-col"><h4>📋 План</h4>'+
-            '<div class="plan-item" style="margin-bottom:0.5rem;"><div class="plan-item-label">Вход</div><div class="plan-item-value neutral">$'+parseFloat(p.plannedEntry).toFixed(6)+'</div></div>'+
-            '<div class="plan-item" style="margin-bottom:0.5rem;"><div class="plan-item-label">Выход (TP)</div><div class="plan-item-value positive">$'+parseFloat(p.plannedTP).toFixed(6)+'</div></div>'+
-            '<div class="plan-item"><div class="plan-item-label">Ожидаемая прибыль</div><div class="plan-item-value positive">+$'+plannedPnL.toFixed(2)+'</div></div>'+
-          '</div>'+
-          '<div class="plan-comparison-col"><h4>✅ Факт</h4>'+
-            '<div class="plan-item" style="margin-bottom:0.5rem;"><div class="plan-item-label">Вход</div><div class="plan-item-value neutral">$'+parseFloat(p.actualEntry||0).toFixed(6)+'</div></div>'+
-            '<div class="plan-item" style="margin-bottom:0.5rem;"><div class="plan-item-label">Выход</div><div class="plan-item-value '+((p.actualPnL||0)>=0?'positive':'negative')+'">$'+parseFloat(p.actualExit||0).toFixed(6)+'</div></div>'+
-            '<div class="plan-item"><div class="plan-item-label">Факт. прибыль</div><div class="plan-item-value '+((p.actualPnL||0)>=0?'positive':'negative')+'">'+((p.actualPnL||0)>=0?'+':'')+'$'+(p.actualPnL||0).toFixed(2)+'</div></div>'+
-          '</div>'+
-        '</div>'+
-        (p.followedPlan?'<div style="margin-top:1rem;padding:0.75rem;background:rgba(0,255,157,0.05);border-radius:8px;font-size:0.9rem;">Соблюдение: <strong style="color:var(--neon-green);">'+fLabels[p.followedPlan]+'</strong></div>':'')
-      :'')+
-      (p.notes?'<div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-secondary);"><em>'+p.notes+'</em></div>':'')+
-    '</div>';
+    
+    let h = '<div class="plan-card plan-'+p.status+'">';
+    h += '<div class="plan-header">';
+    h += '<div><span class="plan-title">'+p.token+'</span><span style="margin-left:0.5rem;color:var(--text-secondary);font-size:0.85rem;">'+(p.direction==='long'?'📈 Лонг':'📉 Шорт')+'</span></div>';
+    h += '<div style="display:flex;gap:0.5rem;align-items:center;">';
+    h += '<span class="plan-status '+p.status+'">'+labels[p.status]+'</span>';
+    h += '<button class="edit-plan" data-id="'+p.id+'" style="background:var(--bg-input);border:var(--glass-border);border-radius:6px;padding:0.4rem 0.6rem;cursor:pointer;color:var(--text-secondary);">✏️</button>';
+    h += '<button class="delete-plan" data-id="'+p.id+'" style="background:var(--bg-input);border:var(--glass-border);border-radius:6px;padding:0.4rem 0.6rem;cursor:pointer;color:var(--text-secondary);">🗑️</button>';
+    h += '</div></div>';
+    h += '<div class="plan-grid">';
+    h += '<div class="plan-item"><div class="plan-item-label">Вход</div><div class="plan-item-value neutral">$'+parseFloat(p.plannedEntry).toFixed(6)+'</div></div>';
+    h += '<div class="plan-item"><div class="plan-item-label">Stop Loss</div><div class="plan-item-value negative">$'+parseFloat(p.plannedSL).toFixed(6)+'</div></div>';
+    h += '<div class="plan-item"><div class="plan-item-label">Take Profit</div><div class="plan-item-value positive">$'+parseFloat(p.plannedTP).toFixed(6)+'</div></div>';
+    h += '<div class="plan-item"><div class="plan-item-label">Размер</div><div class="plan-item-value">'+parseFloat(p.positionSize).toLocaleString()+'</div></div>';
+    h += '<div class="plan-item"><div class="plan-item-label">Риск</div><div class="plan-item-value warning">'+p.riskPercent+'%</div></div>';
+    h += '<div class="plan-item"><div class="plan-item-label">R:R</div><div class="plan-item-value neutral">1:'+rr.toFixed(2)+'</div></div>';
+    h += '</div>';
+    if (p.reason) h += '<div style="margin-bottom:0.75rem;"><span style="font-size:0.85rem;color:var(--text-secondary);">Причина:</span> <span style="font-size:0.9rem;">'+p.reason+'</span></div>';
+    if (p.checklist && p.checklist.length > 0) {
+      h += '<div style="margin-bottom:0.75rem;"><div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem;">Чек-лист:</div>';
+      for (let i = 0; i < p.checklist.length; i++) {
+        const item = p.checklist[i];
+        h += '<div class="checklist-item"><input type="checkbox" '+(item.checked?'checked':'')+' disabled><span style="'+(item.checked?'color:var(--neon-green);':'color:var(--text-secondary);')+'">'+item.text+'</span></div>';
+      }
+      h += '</div>';
+    }
+    if (p.status==='pending') h += '<button class="btn complete-plan" data-id="'+p.id+'" style="margin-top:0.5rem;">✓ Закрыть план</button>';
+    if (p.status==='completed') {
+      h += '<div class="plan-comparison">';
+      h += '<div class="plan-comparison-col"><h4>📋 План</h4>';
+      h += '<div class="plan-item" style="margin-bottom:0.5rem;"><div class="plan-item-label">Вход</div><div class="plan-item-value neutral">$'+parseFloat(p.plannedEntry).toFixed(6)+'</div></div>';
+      h += '<div class="plan-item" style="margin-bottom:0.5rem;"><div class="plan-item-label">Выход (TP)</div><div class="plan-item-value positive">$'+parseFloat(p.plannedTP).toFixed(6)+'</div></div>';
+      h += '<div class="plan-item"><div class="plan-item-label">Ожидаемая прибыль</div><div class="plan-item-value positive">+$'+plannedPnL.toFixed(2)+'</div></div>';
+      h += '</div>';
+      h += '<div class="plan-comparison-col"><h4>✅ Факт</h4>';
+      const actualPnL = p.actualPnL || 0;
+      const pnlClass = actualPnL >= 0 ? 'positive' : 'negative';
+      h += '<div class="plan-item" style="margin-bottom:0.5rem;"><div class="plan-item-label">Вход</div><div class="plan-item-value neutral">$'+parseFloat(p.actualEntry||0).toFixed(6)+'</div></div>';
+      h += '<div class="plan-item" style="margin-bottom:0.5rem;"><div class="plan-item-label">Выход</div><div class="plan-item-value '+pnlClass+'">$'+parseFloat(p.actualExit||0).toFixed(6)+'</div></div>';
+      h += '<div class="plan-item"><div class="plan-item-label">Факт. прибыль</div><div class="plan-item-value '+pnlClass+'">'+(actualPnL>=0?'+':'')+'$'+actualPnL.toFixed(2)+'</div></div>';
+      h += '</div></div>';
+      if (p.followedPlan) h += '<div style="margin-top:1rem;padding:0.75rem;background:rgba(0,255,157,0.05);border-radius:8px;font-size:0.9rem;">Соблюдение: <strong style="color:var(--neon-green);">'+fLabels[p.followedPlan]+'</strong></div>';
+    }
+    if (p.notes) h += '<div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-secondary);"><em>'+p.notes+'</em></div>';
+    h += '</div>';
+    return h;
   }
 
-  function openPlanModal(id = null, isComplete = false) {
+  function openPlanModal(id, isComplete) {
     const title = document.getElementById('modal-title');
     editingPlanId = id; editingTradeId = null; editingDiaryId = null;
     planChecklist = defaultChecklist.map(t => ({text:t, checked:false}));
@@ -458,7 +529,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     renderSelectedTags();
     const notesField = document.getElementById('trade-notes');
-    const clHtml = '<div class="checklist-container" style="margin-top:0.5rem;"><label style="font-size:0.85rem;color:var(--text-secondary);font-weight:500;display:block;margin-bottom:0.5rem;">Чек-лист:</label>'+planChecklist.map((it,i)=>'<div class="checklist-item"><input type="checkbox" class="checklist-item-input" data-idx="'+i+'" '+(it.checked?'checked':'')+'><span>'+it.text+'</span></div>').join('')+'</div>';
+    let clHtml = '<div class="checklist-container" style="margin-top:0.5rem;"><label style="font-size:0.85rem;color:var(--text-secondary);font-weight:500;display:block;margin-bottom:0.5rem;">Чек-лист:</label>';
+    for (let i = 0; i < planChecklist.length; i++) {
+      const it = planChecklist[i];
+      clHtml += '<div class="checklist-item"><input type="checkbox" class="checklist-item-input" data-idx="'+i+'" '+(it.checked?'checked':'')+'><span>'+it.text+'</span></div>';
+    }
+    clHtml += '</div>';
     notesField.parentElement.insertAdjacentHTML('afterend', clHtml);
     document.getElementById('trade-modal').showModal();
   }
@@ -505,36 +581,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     const c = document.createElement('div');
     const sorted = [...diaryEntries].sort((a,b) => new Date(b.date)-new Date(a.date));
     const avgEmotion = diaryEntries.length>0 ? (diaryEntries.reduce((s,e)=>s+(e.emotion||5),0)/diaryEntries.length).toFixed(1) : 0;
-    c.innerHTML = '<section class="section">'+
-      '<div class="section-header"><h2>📝 Дневник трейдера</h2><button class="btn" id="add-diary-btn">+ Новая запись</button></div>'+
-      '<div class="diary-stats-grid">'+
-        '<div class="stat-card"><h3>Всего записей</h3><div class="stat-value neutral">'+diaryEntries.length+'</div></div>'+
-        '<div class="stat-card"><h3>Среднее настроение</h3><div class="stat-value '+(avgEmotion>=7?'positive':avgEmotion>=4?'warning':'negative')+'">'+avgEmotion+'/10</div></div>'+
-        '<div class="stat-card"><h3>Последняя запись</h3><div class="stat-value neutral" style="font-size:1rem;">'+(sorted.length>0?sorted[0].date:'—')+'</div></div>'+
-      '</div>'+
-      (sorted.length>0?sorted.map(e=>renderDiaryCard(e)).join(''):'<div class="empty-state">Нет записей. Начни вести дневник!</div>')+
-    '</section>';
+    
+    let html = '<section class="section">';
+    html += '<div class="section-header"><h2>📝 Дневник трейдера</h2><button class="btn" id="add-diary-btn">+ Новая запись</button></div>';
+    html += '<div class="diary-stats-grid">';
+    html += '<div class="stat-card"><h3>Всего записей</h3><div class="stat-value neutral">'+diaryEntries.length+'</div></div>';
+    html += '<div class="stat-card"><h3>Среднее настроение</h3><div class="stat-value '+(avgEmotion>=7?'positive':avgEmotion>=4?'warning':'negative')+'">'+avgEmotion+'/10</div></div>';
+    html += '<div class="stat-card"><h3>Последняя запись</h3><div class="stat-value neutral" style="font-size:1rem;">'+(sorted.length>0?sorted[0].date:'—')+'</div></div>';
+    html += '</div>';
+    if (sorted.length > 0) {
+      for (let i = 0; i < sorted.length; i++) {
+        html += renderDiaryCard(sorted[i]);
+      }
+    } else {
+      html += '<div class="empty-state">Нет записей. Начни вести дневник!</div>';
+    }
+    html += '</section>';
+    c.innerHTML = html;
     const main = document.getElementById('main-content'); main.innerHTML = ''; main.appendChild(c);
   }
+  
   function renderDiaryCard(e) {
     const em = emotions.find(x=>x.value===e.emotion) || emotions[4];
     const dayTrades = trades.filter(t => t.date === e.date);
     const dayPnL = dayTrades.reduce((s,t) => s + TradingStats.calculatePnL(t), 0);
-    return '<div class="diary-card">'+
-      '<div class="diary-header">'+
-        '<div><span class="diary-date">'+e.date+'</span> <span style="font-size:2rem;margin-left:0.5rem;">'+em.emoji+'</span> <span style="color:var(--text-secondary);font-size:0.9rem;">'+em.label+' ('+e.emotion+'/10)</span></div>'+
-        '<div class="trade-actions"><button class="edit-diary" data-id="'+e.id+'">✏️</button><button class="delete-diary" data-id="'+e.id+'">🗑️</button></div>'+
-      '</div>'+
-      (dayTrades.length>0?'<div class="diary-section"><h4>📊 Сделки за день ('+dayTrades.length+') — P&L: <span style="color:'+(dayPnL>=0?'var(--neon-green)':'var(--neon-red)')+';">'+(dayPnL>=0?'+':'')+'$'+dayPnL.toFixed(2)+'</span></h4>'+
-        '<div class="diary-trades-list">'+dayTrades.map(t=>{const p=TradingStats.calculatePnL(t);return '<div class="diary-trade-item"><span>'+t.token+' '+t.time+'</span><span style="color:'+(p>=0?'var(--neon-green)':'var(--neon-red)')+';">'+(p>=0?'+':'')+'$'+p.toFixed(2)+'</span></div>';}).join('')+'</div>'+
-      '</div>':'')+
-      (e.wentWell?'<div class="diary-section"><h4>✅ Что получилось</h4><div style="font-size:0.95rem;white-space:pre-wrap;">'+e.wentWell+'</div></div>':'')+
-      (e.wentBad?'<div class="diary-section"><h4>❌ Что не получилось</h4><div style="font-size:0.95rem;white-space:pre-wrap;">'+e.wentBad+'</div></div>':'')+
-      (e.lessons?'<div class="diary-section"><h4>💡 Уроки дня</h4><div style="font-size:0.95rem;white-space:pre-wrap;color:var(--neon-cyan);">'+e.lessons+'</div></div>':'')+
-      (e.notes?'<div class="diary-section"><h4>📝 Заметки</h4><div style="font-size:0.9rem;color:var(--text-secondary);white-space:pre-wrap;">'+e.notes+'</div></div>':'')+
-    '</div>';
+    
+    let h = '<div class="diary-card">';
+    h += '<div class="diary-header">';
+    h += '<div><span class="diary-date">'+e.date+'</span> <span style="font-size:2rem;margin-left:0.5rem;">'+em.emoji+'</span> <span style="color:var(--text-secondary);font-size:0.9rem;">'+em.label+' ('+e.emotion+'/10)</span></div>';
+    h += '<div class="trade-actions"><button class="edit-diary" data-id="'+e.id+'">✏️</button><button class="delete-diary" data-id="'+e.id+'">🗑️</button></div>';
+    h += '</div>';
+    if (dayTrades.length > 0) {
+      const pnlColor = dayPnL >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+      const pnlSign = dayPnL >= 0 ? '+' : '';
+      h += '<div class="diary-section"><h4>📊 Сделки за день ('+dayTrades.length+') — P&L: <span style="color:'+pnlColor+';">'+pnlSign+'$'+dayPnL.toFixed(2)+'</span></h4>';
+      h += '<div class="diary-trades-list">';
+      for (let i = 0; i < dayTrades.length; i++) {
+        const t = dayTrades[i];
+        const p = TradingStats.calculatePnL(t);
+        const color = p >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+        const sign = p >= 0 ? '+' : '';
+        h += '<div class="diary-trade-item"><span>'+t.token+' '+t.time+'</span><span style="color:'+color+';">'+sign+'$'+p.toFixed(2)+'</span></div>';
+      }
+      h += '</div></div>';
+    }
+    if (e.wentWell) h += '<div class="diary-section"><h4>✅ Что получилось</h4><div style="font-size:0.95rem;white-space:pre-wrap;">'+e.wentWell+'</div></div>';
+    if (e.wentBad) h += '<div class="diary-section"><h4>❌ Что не получилось</h4><div style="font-size:0.95rem;white-space:pre-wrap;">'+e.wentBad+'</div></div>';
+    if (e.lessons) h += '<div class="diary-section"><h4>💡 Уроки дня</h4><div style="font-size:0.95rem;white-space:pre-wrap;color:var(--neon-cyan);">'+e.lessons+'</div></div>';
+    if (e.notes) h += '<div class="diary-section"><h4>📝 Заметки</h4><div style="font-size:0.9rem;color:var(--text-secondary);white-space:pre-wrap;">'+e.notes+'</div></div>';
+    h += '</div>';
+    return h;
   }
-  function openDiaryModal(id = null) {
+  
+  function openDiaryModal(id) {
     editingDiaryId = id; editingTradeId = null; editingPlanId = null;
     const title = document.getElementById('modal-title');
     title.textContent = id ? 'Редактировать запись' : 'Новая запись в дневник';
@@ -552,10 +651,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const em = document.querySelector('.emotion-container'); if (em) em.remove();
     
     const notesField = document.getElementById('trade-notes');
-    const emotionHtml = '<div class="emotion-container" style="margin-top:0.5rem;">'+
-      '<label style="font-size:0.85rem;color:var(--text-secondary);font-weight:500;display:block;margin-bottom:0.5rem;">Настроение:</label>'+
-      '<div class="emotion-meter">'+emotions.map(em => '<button type="button" class="emotion-btn '+(id && diaryEntries.find(d=>d.id===id)?.emotion===em.value?'active':'')+'" data-value="'+em.value+'" title="'+em.label+'">'+em.emoji+'</button>').join('')+'</div>'+
-    '</div>';
+    let emotionHtml = '<div class="emotion-container" style="margin-top:0.5rem;">';
+    emotionHtml += '<label style="font-size:0.85rem;color:var(--text-secondary);font-weight:500;display:block;margin-bottom:0.5rem;">Настроение:</label>';
+    emotionHtml += '<div class="emotion-meter">';
+    for (let i = 0; i < emotions.length; i++) {
+      const emo = emotions[i];
+      const isActive = (id && diaryEntries.find(d=>d.id===id)?.emotion===emo.value) ? 'active' : '';
+      emotionHtml += '<button type="button" class="emotion-btn '+isActive+'" data-value="'+emo.value+'" title="'+emo.label+'">'+emo.emoji+'</button>';
+    }
+    emotionHtml += '</div></div>';
     notesField.parentElement.insertAdjacentHTML('afterend', emotionHtml);
     
     if (id) {
@@ -567,6 +671,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     document.getElementById('trade-modal').showModal();
   }
+  
   async function saveDiary() {
     const emotionBtn = document.querySelector('.emotion-btn.active');
     const emotion = emotionBtn ? parseInt(emotionBtn.dataset.value) : 5;
@@ -589,68 +694,135 @@ document.addEventListener('DOMContentLoaded', async () => {
     const s = TradingStats.calculate(f, initialDeposit);
     const c = document.createElement('div');
     const tokenStats = {}, tagStats = {};
-    for (const t of f) {
+    
+    for (let i = 0; i < f.length; i++) {
+      const t = f[i];
       const tk = t.token.toUpperCase();
       if (!tokenStats[tk]) tokenStats[tk] = {trades:0,profit:0,wins:0,losses:0};
       const pnl = TradingStats.calculatePnL(t);
       tokenStats[tk].trades++; tokenStats[tk].profit += pnl;
-      if (pnl>0) tokenStats[tk].wins++; else if (pnl<0) tokenStats[tk].losses++;
+      if (pnl > 0) tokenStats[tk].wins++; else if (pnl < 0) tokenStats[tk].losses++;
       
-      for (const tag of (t.tags||[])) {
-        const tagKey = tag.toLowerCase();
-        if (!tagStats[tagKey]) tagStats[tagKey]={trades:0,profit:0,wins:0,losses:0,original:tag};
-        tagStats[tagKey].trades++; tagStats[tagKey].profit+=pnl;
-        if (pnl>0) tagStats[tagKey].wins++; else if (pnl<0) tagStats[tagKey].losses++;
+      if (t.tags) {
+        for (let j = 0; j < t.tags.length; j++) {
+          const tagKey = t.tags[j].toLowerCase();
+          if (!tagStats[tagKey]) tagStats[tagKey]={trades:0,profit:0,wins:0,losses:0,original:t.tags[j]};
+          tagStats[tagKey].trades++; tagStats[tagKey].profit+=pnl;
+          if (pnl > 0) tagStats[tagKey].wins++; else if (pnl < 0) tagStats[tagKey].losses++;
+        }
       }
     }
+    
     const tsa = Object.entries(tokenStats).map(([k,v])=>({token:k,...v})).sort((a,b)=>b.profit-a.profit);
     const tsa2 = Object.entries(tagStats).map(([k,v])=>({tag:v.original||k,...v})).sort((a,b)=>b.profit-a.profit);
     const eq = calculateEquityCurve(f);
     const withPnl = f.map(t=>({...t,pnl:TradingStats.calculatePnL(t)})).sort((a,b)=>b.pnl-a.pnl);
     const best = withPnl.filter(t=>t.pnl>0).slice(0,5);
     const worst = withPnl.filter(t=>t.pnl<0).slice(0,5);
-    c.innerHTML = renderPeriodFilter()+renderTagFilter()+
-      '<section class="section"><div class="section-header"><h2>📈 Equity Curve</h2></div>'+
-        '<div class="stat-card" style="padding:1.5rem;"><canvas id="equity-chart" width="800" height="300" style="width:100%;height:300px;"></canvas></div>'+
-      '</section>'+
-      '<section class="section"><div class="section-header"><h2>📊 Статистика</h2></div>'+
-        '<div class="stats-grid">'+
-          '<div class="stat-card"><h3>Средний выигрыш</h3><div class="stat-value positive">'+TradingStats.formatMoney(s.averageWin)+'</div></div>'+
-          '<div class="stat-card"><h3>Средний проигрыш</h3><div class="stat-value negative">-'+TradingStats.formatMoney(s.averageLoss).replace('+','')+'</div></div>'+
-          '<div class="stat-card"><h3>Соотношение</h3><div class="stat-value neutral">'+(s.averageLoss>0?(s.averageWin/s.averageLoss).toFixed(2):'∞')+'</div></div>'+
-          '<div class="stat-card"><h3>Прибыль</h3><div class="stat-value '+(s.totalProfit>=0?'positive':'negative')+'">'+TradingStats.formatMoney(s.totalProfit)+'</div></div>'+
-          '<div class="stat-card"><h3>Убыток</h3><div class="stat-value negative">-'+TradingStats.formatMoney(s.totalLoss).replace('+','')+'</div></div>'+
-          '<div class="stat-card"><h3>Депозит</h3><div class="stat-value neutral">$'+initialDeposit.toFixed(2)+'</div></div>'+
-        '</div>'+
-      '</section>'+
-      '<section class="section"><div class="section-header"><h2>🏆 По тегам</h2></div>'+
-        '<div class="trades-table">'+(tsa2.length>0?'<div class="trade-row header"><div>Тег</div><div>Сделок</div><div>Приб</div><div>Убыт</div><div>WR</div><div>Прибыль</div></div>'+tsa2.map(t=>{const w=t.trades>0?(t.wins/t.trades*100).toFixed(0):0;const c=t.profit>=0?'positive':'negative';return '<div class="trade-row"><div><span class="tag '+getTagClass(t.tag)+'">'+t.tag+'</span></div><div>'+t.trades+'</div><div style="color:var(--neon-green);">'+t.wins+'</div><div style="color:var(--neon-red);">'+t.losses+'</div><div>'+w+'%</div><div class="trade-pnl '+c+'">'+TradingStats.formatMoney(t.profit)+'</div></div>';}).join('')':'<div class="empty-state">Нет данных</div>')+'</div>'+
-      '</section>'+
-      '<section class="section"><div class="section-header"><h2>🏆 По токенам</h2></div>'+
-        '<div class="trades-table">'+(tsa.length>0?'<div class="trade-row header"><div>Токен</div><div>Сделок</div><div>Приб</div><div>Убыт</div><div>WR</div><div>Прибыль</div></div>'+tsa.map(t=>{const w=t.trades>0?(t.wins/t.trades*100).toFixed(0):0;const c=t.profit>=0?'positive':'negative';return '<div class="trade-row"><div class="trade-token">'+t.token+'</div><div>'+t.trades+'</div><div style="color:var(--neon-green);">'+t.wins+'</div><div style="color:var(--neon-red);">'+t.losses+'</div><div>'+w+'%</div><div class="trade-pnl '+c+'">'+TradingStats.formatMoney(t.profit)+'</div></div>';}).join('')':'<div class="empty-state">Нет данных</div>')+'</div>'+
-      '</section>'+
-      '<section class="section"><div class="section-header"><h2>📈 Лучшие</h2></div>'+
-        '<div class="trades-table">'+(best.length>0?'<div class="trade-row header"><div>Дата</div><div>Токен</div><div>Вход/Выход</div><div>Кол-во</div><div></div><div>P&L</div><div></div></div>'+best.map(t=>'<div class="trade-row"><div class="trade-date">'+t.date+' '+t.time+'</div><div class="trade-token">'+t.token+'</div><div><div>$'+parseFloat(t.entryPrice).toFixed(6)+'</div><div>$'+parseFloat(t.exitPrice).toFixed(6)+'</div></div><div>'+parseFloat(t.quantity).toLocaleString()+'</div><div></div><div class="trade-pnl positive">'+TradingStats.formatMoney(t.pnl)+'</div><div></div></div>').join('')':'<div class="empty-state">Нет прибыльных</div>')+'</div>'+
-      '</section>'+
-      '<section class="section"><div class="section-header"><h2>📉 Худшие</h2></div>'+
-        '<div class="trades-table">'+(worst.length>0?'<div class="trade-row header"><div>Дата</div><div>Токен</div><div>Вход/Выход</div><div>Кол-во</div><div></div><div>P&L</div><div></div></div>'+worst.map(t=>'<div class="trade-row"><div class="trade-date">'+t.date+' '+t.time+'</div><div class="trade-token">'+t.token+'</div><div><div>$'+parseFloat(t.entryPrice).toFixed(6)+'</div><div>$'+parseFloat(t.exitPrice).toFixed(6)+'</div></div><div>'+parseFloat(t.quantity).toLocaleString()+'</div><div></div><div class="trade-pnl negative">'+TradingStats.formatMoney(t.pnl)+'</div><div></div></div>').join('')':'<div class="empty-state">Нет убыточных 🎉</div>')+'</div>'+
-      '</section>';
-    const main = document.getElementById('main-content'); main.innerHTML = ''; main.appendChild(c);
+    
+    let html = renderPeriodFilter() + renderTagFilter();
+    
+    html += '<section class="section"><div class="section-header"><h2>📈 Equity Curve</h2></div>';
+    html += '<div class="stat-card" style="padding:1.5rem;"><canvas id="equity-chart" width="800" height="300" style="width:100%;height:300px;"></canvas></div></section>';
+    
+    html += '<section class="section"><div class="section-header"><h2>📊 Статистика</h2></div><div class="stats-grid">';
+    html += '<div class="stat-card"><h3>Средний выигрыш</h3><div class="stat-value positive">'+TradingStats.formatMoney(s.averageWin)+'</div></div>';
+    html += '<div class="stat-card"><h3>Средний проигрыш</h3><div class="stat-value negative">-'+TradingStats.formatMoney(s.averageLoss).replace('+','')+'</div></div>';
+    html += '<div class="stat-card"><h3>Соотношение</h3><div class="stat-value neutral">'+(s.averageLoss>0?(s.averageWin/s.averageLoss).toFixed(2):'∞')+'</div></div>';
+    html += '<div class="stat-card"><h3>Прибыль</h3><div class="stat-value '+(s.totalProfit>=0?'positive':'negative')+'">'+TradingStats.formatMoney(s.totalProfit)+'</div></div>';
+    html += '<div class="stat-card"><h3>Убыток</h3><div class="stat-value negative">-'+TradingStats.formatMoney(s.totalLoss).replace('+','')+'</div></div>';
+    html += '<div class="stat-card"><h3>Депозит</h3><div class="stat-value neutral">$'+initialDeposit.toFixed(2)+'</div></div>';
+    html += '</div></section>';
+    
+    html += '<section class="section"><div class="section-header"><h2>🏆 По тегам</h2></div><div class="trades-table">';
+    if (tsa2.length > 0) {
+      html += '<div class="trade-row header"><div>Тег</div><div>Сделок</div><div>Приб</div><div>Убыт</div><div>WR</div><div>Прибыль</div></div>';
+      for (let i = 0; i < tsa2.length; i++) {
+        const t = tsa2[i];
+        const w = t.trades > 0 ? (t.wins / t.trades * 100).toFixed(0) : 0;
+        const cls = t.profit >= 0 ? 'positive' : 'negative';
+        html += '<div class="trade-row"><div><span class="tag '+getTagClass(t.tag)+'">'+t.tag+'</span></div>';
+        html += '<div>'+t.trades+'</div><div style="color:var(--neon-green);">'+t.wins+'</div>';
+        html += '<div style="color:var(--neon-red);">'+t.losses+'</div><div>'+w+'%</div>';
+        html += '<div class="trade-pnl '+cls+'">'+TradingStats.formatMoney(t.profit)+'</div></div>';
+      }
+    } else {
+      html += '<div class="empty-state">Нет данных</div>';
+    }
+    html += '</div></section>';
+    
+    html += '<section class="section"><div class="section-header"><h2>🏆 По токенам</h2></div><div class="trades-table">';
+    if (tsa.length > 0) {
+      html += '<div class="trade-row header"><div>Токен</div><div>Сделок</div><div>Приб</div><div>Убыт</div><div>WR</div><div>Прибыль</div></div>';
+      for (let i = 0; i < tsa.length; i++) {
+        const t = tsa[i];
+        const w = t.trades > 0 ? (t.wins / t.trades * 100).toFixed(0) : 0;
+        const cls = t.profit >= 0 ? 'positive' : 'negative';
+        html += '<div class="trade-row"><div class="trade-token">'+t.token+'</div><div>'+t.trades+'</div>';
+        html += '<div style="color:var(--neon-green);">'+t.wins+'</div><div style="color:var(--neon-red);">'+t.losses+'</div>';
+        html += '<div>'+w+'%</div><div class="trade-pnl '+cls+'">'+TradingStats.formatMoney(t.profit)+'</div></div>';
+      }
+    } else {
+      html += '<div class="empty-state">Нет данных</div>';
+    }
+    html += '</div></section>';
+    
+    html += '<section class="section"><div class="section-header"><h2>📈 Лучшие</h2></div><div class="trades-table">';
+    if (best.length > 0) {
+      html += '<div class="trade-row header"><div>Дата</div><div>Токен</div><div>Вход/Выход</div><div>Кол-во</div><div></div><div>P&L</div><div></div></div>';
+      for (let i = 0; i < best.length; i++) {
+        const t = best[i];
+        html += '<div class="trade-row"><div class="trade-date">'+t.date+' '+t.time+'</div>';
+        html += '<div class="trade-token">'+t.token+'</div><div><div>$'+parseFloat(t.entryPrice).toFixed(6)+'</div>';
+        html += '<div>$'+parseFloat(t.exitPrice).toFixed(6)+'</div></div><div>'+parseFloat(t.quantity).toLocaleString()+'</div>';
+        html += '<div></div><div class="trade-pnl positive">'+TradingStats.formatMoney(t.pnl)+'</div><div></div></div>';
+      }
+    } else {
+      html += '<div class="empty-state">Нет прибыльных</div>';
+    }
+    html += '</div></section>';
+    
+    html += '<section class="section"><div class="section-header"><h2>📉 Худшие</h2></div><div class="trades-table">';
+    if (worst.length > 0) {
+      html += '<div class="trade-row header"><div>Дата</div><div>Токен</div><div>Вход/Выход</div><div>Кол-во</div><div></div><div>P&L</div><div></div></div>';
+      for (let i = 0; i < worst.length; i++) {
+        const t = worst[i];
+        html += '<div class="trade-row"><div class="trade-date">'+t.date+' '+t.time+'</div>';
+        html += '<div class="trade-token">'+t.token+'</div><div><div>$'+parseFloat(t.entryPrice).toFixed(6)+'</div>';
+        html += '<div>$'+parseFloat(t.exitPrice).toFixed(6)+'</div></div><div>'+parseFloat(t.quantity).toLocaleString()+'</div>';
+        html += '<div></div><div class="trade-pnl negative">'+TradingStats.formatMoney(t.pnl)+'</div><div></div></div>';
+      }
+    } else {
+      html += '<div class="empty-state">Нет убыточных 🎉</div>';
+    }
+    html += '</div></section>';
+    
+    c.innerHTML = html;
+    const main = document.getElementById('main-content'); 
+    main.innerHTML = ''; 
+    main.appendChild(c);
     setTimeout(() => drawEquityCurve(eq), 0);
   }
+  
   function calculateEquityCurve(list) {
     const s = [...list].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
     const d = [{date:'Старт',balance:initialDeposit,pnl:0}];
     let b = initialDeposit;
-    for (const t of s) { const p = TradingStats.calculatePnL(t); b+=p; d.push({date:t.date.slice(5)+' '+t.time.slice(0,5),balance:b,pnl:p}); }
+    for (let i = 0; i < s.length; i++) {
+      const t = s[i];
+      const p = TradingStats.calculatePnL(t); 
+      b += p; 
+      d.push({date:t.date.slice(5)+' '+t.time.slice(0,5),balance:b,pnl:p});
+    }
     return d;
   }
+  
   function drawEquityCurve(data) {
     const cv = document.getElementById('equity-chart');
     if (!cv) return;
     const ctx = cv.getContext('2d'), w = cv.width, h = cv.height, p = 40;
     ctx.clearRect(0,0,w,h);
-    if (data.length<2) { ctx.fillStyle='#a0a0b0'; ctx.font='16px Inter'; ctx.textAlign='center'; ctx.fillText('Недостаточно данных',w/2,h/2); return; }
+    if (data.length < 2) { ctx.fillStyle='#a0a0b0'; ctx.font='16px Inter'; ctx.textAlign='center'; ctx.fillText('Недостаточно данных',w/2,h/2); return; }
     const bal = data.map(d=>d.balance), min = Math.min(...bal)*0.95, max = Math.max(...bal)*1.05, rng = max-min||1;
     ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1;
     for (let i=0;i<=4;i++) { const y=p+(h-2*p)*(i/4); ctx.beginPath(); ctx.moveTo(p,y); ctx.lineTo(w-p,y); ctx.stroke(); ctx.fillStyle='#a0a0b0'; ctx.font='11px Inter'; ctx.textAlign='right'; ctx.fillText('$'+(max-(rng*i/4)).toFixed(2),p-5,y+4); }
@@ -667,37 +839,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderCalculators() {
     const c = document.createElement('div');
-    c.innerHTML = '<section class="section"><div class="section-header"><h2>🧮 Калькуляторы</h2></div>'+
-      '<div class="calc-grid">'+
-        '<div class="calc-card"><h3>📐 Размер позиции</h3><p class="calc-desc">Сколько купить при риске X%</p>'+
-          '<div class="calc-field"><label>Депозит ($)</label><input type="number" id="calc-deposit" class="form-input" value="'+(initialDeposit||100)+'" step="any"></div>'+
-          '<div class="calc-field"><label>Риск (%)</label><input type="number" id="calc-risk-percent" class="form-input" value="2" step="any"></div>'+
-          '<div class="calc-field"><label>Вход ($)</label><input type="number" id="calc-entry-price" class="form-input" step="any"></div>'+
-          '<div class="calc-field"><label>Stop Loss ($)</label><input type="number" id="calc-sl-price" class="form-input" step="any"></div>'+
-          '<div class="calc-result" id="position-result" style="display:none;"></div>'+
-        '</div>'+
-        '<div class="calc-card"><h3>⚖️ Risk/Reward</h3><p class="calc-desc">Оцени сделку</p>'+
-          '<div class="calc-field"><label>Вход ($)</label><input type="number" id="rr-entry" class="form-input" step="any"></div>'+
-          '<div class="calc-field"><label>Stop Loss ($)</label><input type="number" id="rr-sl" class="form-input" step="any"></div>'+
-          '<div class="calc-field"><label>Take Profit ($)</label><input type="number" id="rr-tp" class="form-input" step="any"></div>'+
-          '<div class="calc-field"><label>Количество</label><input type="number" id="rr-qty" class="form-input" step="any"></div>'+
-          '<div class="calc-result" id="rr-result" style="display:none;"></div>'+
-        '</div>'+
-        '<div class="calc-card"><h3>📈 Сложный %</h3><p class="calc-desc">Сила регулярной прибыли</p>'+
-          '<div class="calc-field"><label>Капитал ($)</label><input type="number" id="cp-initial" class="form-input" value="'+(initialDeposit||100)+'" step="any"></div>'+
-          '<div class="calc-field"><label>Прибыль (%)</label><input type="number" id="cp-percent" class="form-input" value="5" step="any"></div>'+
-          '<div class="calc-field"><label>Сделок</label><input type="number" id="cp-trades" class="form-input" value="20" step="1"></div>'+
-          '<div class="calc-result" id="cp-result" style="display:none;"></div>'+
-        '</div>'+
-      '</div></section>';
+    let html = '<section class="section"><div class="section-header"><h2>🧮 Калькуляторы</h2></div>';
+    html += '<div class="calc-grid">';
+    html += '<div class="calc-card"><h3>📐 Размер позиции</h3><p class="calc-desc">Сколько купить при риске X%</p>';
+    html += '<div class="calc-field"><label>Депозит ($)</label><input type="number" id="calc-deposit" class="form-input" value="'+(initialDeposit||100)+'" step="any"></div>';
+    html += '<div class="calc-field"><label>Риск (%)</label><input type="number" id="calc-risk-percent" class="form-input" value="2" step="any"></div>';
+    html += '<div class="calc-field"><label>Вход ($)</label><input type="number" id="calc-entry-price" class="form-input" step="any"></div>';
+    html += '<div class="calc-field"><label>Stop Loss ($)</label><input type="number" id="calc-sl-price" class="form-input" step="any"></div>';
+    html += '<div class="calc-result" id="position-result" style="display:none;"></div></div>';
+    html += '<div class="calc-card"><h3>⚖️ Risk/Reward</h3><p class="calc-desc">Оцени сделку</p>';
+    html += '<div class="calc-field"><label>Вход ($)</label><input type="number" id="rr-entry" class="form-input" step="any"></div>';
+    html += '<div class="calc-field"><label>Stop Loss ($)</label><input type="number" id="rr-sl" class="form-input" step="any"></div>';
+    html += '<div class="calc-field"><label>Take Profit ($)</label><input type="number" id="rr-tp" class="form-input" step="any"></div>';
+    html += '<div class="calc-field"><label>Количество</label><input type="number" id="rr-qty" class="form-input" step="any"></div>';
+    html += '<div class="calc-result" id="rr-result" style="display:none;"></div></div>';
+    html += '<div class="calc-card"><h3>📈 Сложный %</h3><p class="calc-desc">Сила регулярной прибыли</p>';
+    html += '<div class="calc-field"><label>Капитал ($)</label><input type="number" id="cp-initial" class="form-input" value="'+(initialDeposit||100)+'" step="any"></div>';
+    html += '<div class="calc-field"><label>Прибыль (%)</label><input type="number" id="cp-percent" class="form-input" value="5" step="any"></div>';
+    html += '<div class="calc-field"><label>Сделок</label><input type="number" id="cp-trades" class="form-input" value="20" step="1"></div>';
+    html += '<div class="calc-result" id="cp-result" style="display:none;"></div></div>';
+    html += '</div></section>';
+    c.innerHTML = html;
     const main = document.getElementById('main-content'); main.innerHTML = ''; main.appendChild(c);
     setupCalculators();
   }
+  
   function setupCalculators() {
     ['calc-deposit','calc-risk-percent','calc-entry-price','calc-sl-price'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',calcPos);});
     ['rr-entry','rr-sl','rr-tp','rr-qty'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',calcRR);});
     ['cp-initial','cp-percent','cp-trades'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',calcCP);});
   }
+  
   function calcPos() {
     const d=parseFloat(document.getElementById('calc-deposit').value)||0, rp=parseFloat(document.getElementById('calc-risk-percent').value)||0, e=parseFloat(document.getElementById('calc-entry-price').value)||0, s=parseFloat(document.getElementById('calc-sl-price').value)||0;
     const r=document.getElementById('position-result');
@@ -708,6 +880,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     r.innerHTML='<div class="calc-result-row"><span class="calc-result-label">Риск:</span><span class="calc-result-value warning">$'+ra.toFixed(2)+'</span></div><div class="calc-result-row"><span class="calc-result-label">Купить:</span><span class="calc-result-value">'+ps.toLocaleString('en-US',{maximumFractionDigits:4})+'</span></div><div class="calc-result-row"><span class="calc-result-label">Сумма:</span><span class="calc-result-value">$'+pv.toFixed(2)+'</span></div>';
     r.style.display='block';
   }
+  
   function calcRR() {
     const e=parseFloat(document.getElementById('rr-entry').value)||0, s=parseFloat(document.getElementById('rr-sl').value)||0, t=parseFloat(document.getElementById('rr-tp').value)||0, q=parseFloat(document.getElementById('rr-qty').value)||0;
     const r=document.getElementById('rr-result');
@@ -718,6 +891,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     r.innerHTML='<div class="calc-result-row"><span class="calc-result-label">Риск:</span><span class="calc-result-value negative">-$'+risk.toFixed(2)+'</span></div><div class="calc-result-row"><span class="calc-result-label">Прибыль:</span><span class="calc-result-value positive">+$'+rew.toFixed(2)+'</span></div><div class="calc-result-row"><span class="calc-result-label">R:R:</span><span class="calc-result-value '+rc+'">'+re+' 1:'+rr.toFixed(2)+'</span></div><div class="calc-result-row"><span class="calc-result-label">Оценка:</span><span class="calc-result-value '+rc+'">'+rt+'</span></div>';
     r.style.display='block';
   }
+  
   function calcCP() {
     const i=parseFloat(document.getElementById('cp-initial').value)||0, p=parseFloat(document.getElementById('cp-percent').value)||0, n=parseInt(document.getElementById('cp-trades').value)||0;
     const r=document.getElementById('cp-result');
@@ -734,55 +908,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isAuth = typeof FirebaseClient !== 'undefined' && FirebaseClient.isAuthenticated();
     const userEmail = isAuth ? FirebaseClient.getCurrentUser()?.email : (localStorage.getItem('guest_mode') === 'true' ? 'Гость' : 'Не авторизован');
     
-    m.innerHTML = '<section class="section"><div class="section-header"><h2>⚙️ Настройки</h2></div>'+
-      '<div class="notif-section">'+
-        '<h3>👤 Аккаунт</h3>'+
-        '<div style="margin-bottom: 1rem;">'+
-          '<span style="color: var(--text-secondary); font-size: 0.9rem;">Email: </span>'+
-          '<span class="notif-status '+(isAuth ? 'enabled' : 'disabled')+'">'+userEmail+'</span>'+
-        '</div>'+
-        '<button class="btn btn-secondary" id="logout-btn" style="margin-bottom: 1rem;">🚪 Выйти</button>'+
-      '</div>'+
-      '<div class="notif-section">'+
-        '<h3>🔔 Уведомления и алерты</h3>'+
-        '<div style="margin-bottom: 1rem;">'+
-          '<span style="color: var(--text-secondary); font-size: 0.9rem;">Статус: </span>'+
-          '<span class="notif-status '+(notifEnabled ? 'enabled' : 'disabled')+'">'+(notifEnabled ? '✅ Включены' : '❌ Выключены')+'</span>'+
-        '</div>'+
-        '<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">'+
-          '<button class="btn" id="enable-notif-btn">'+(notifEnabled ? '🔕 Выключить' : '🔔 Включить уведомления')+'</button>'+
-          '<button class="btn btn-secondary" id="test-notif-btn">🧪 Тест</button>'+
-        '</div>'+
-        '<div class="notif-row"><label>Алерты по ценам (планы)</label><div class="toggle-container"><button class="toggle '+(ns.priceAlerts ? 'active' : '')+'" data-alert="priceAlerts"></button></div></div>'+
-        '<div class="notif-row"><label>Алерты по портфелю</label><div class="toggle-container"><button class="toggle '+(ns.portfolioAlerts ? 'active' : '')+'" data-alert="portfolioAlerts"></button></div></div>'+
-        '<div class="notif-row"><label>Напоминания</label><div class="toggle-container"><button class="toggle '+(ns.reminders ? 'active' : '')+'" data-alert="reminders"></button></div></div>'+
-        '<div class="notif-row"><label>Звук</label><div class="toggle-container"><button class="toggle '+(ns.sound ? 'active' : '')+'" data-alert="sound"></button></div></div>'+
-        '<div class="notif-row"><label>Просадка портфеля (%)</label><input type="number" id="alert-drawdown" value="'+ns.drawdownPercent+'" min="1" max="50"></div>'+
-        '<div class="notif-row"><label>Серия убытков (сделок)</label><input type="number" id="alert-losing-streak" value="'+ns.losingStreak+'" min="2" max="10"></div>'+
-        '<div class="notif-row"><label>Дневной лимит убытков (%)</label><input type="number" id="alert-daily-loss" value="'+ns.dailyLossLimit+'" min="1" max="20"></div>'+
-        '<div class="notif-row"><label>Время напоминания</label><input type="time" id="alert-reminder-time" value="'+ns.reminderTime+'"></div>'+
-        '<button class="btn" id="save-alert-settings" style="margin-top: 1rem;">💾 Сохранить настройки</button>'+
-      '</div>'+
-      '<div class="stat-card" style="margin-bottom:1rem;"><h3 style="margin-bottom:1rem;">Начальный депозит</h3>'+
-        '<div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">'+
-          '<input type="number" id="settings-deposit" class="form-input" value="'+initialDeposit+'" step="any" style="max-width:200px;">'+
-          '<button class="btn" id="save-deposit-btn">Сохранить</button>'+
-        '</div></div>'+
-      '<div class="stat-card" style="margin-bottom:1rem;"><h3 style="margin-bottom:1rem;">🏷️ Теги</h3>'+
-        '<div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">'+
-          '<input type="text" id="new-tag-input" class="form-input" placeholder="Новый тег..." style="max-width:200px;">'+
-          '<button class="btn" id="add-new-tag-btn">Добавить</button>'+
-        '</div>'+
-        '<div style="display:flex;flex-wrap:wrap;gap:0.5rem;">'+availableTags.map(t=>'<span class="tag '+getTagClass(t)+'" style="display:inline-flex;align-items:center;gap:0.3rem;">'+t+'<span class="remove-tag delete-tag-btn" data-tag="'+t+'" style="cursor:pointer;">&times;</span></span>').join('')+'</div>'+
-      '</div>'+
-      '<div class="stat-card" style="margin-bottom:1rem;"><h3 style="margin-bottom:1rem;">📦 Экспорт</h3><button class="btn" id="export-btn">📥 Скачать JSON</button></div>'+
-      '<div class="stat-card" style="margin-bottom:1rem;"><h3 style="margin-bottom:1rem;">📤 Импорт</h3>'+
-        '<input type="file" id="import-file" accept=".json" style="display:none;">'+
-        '<button class="btn btn-secondary" id="import-btn">Выбрать файл</button>'+
-        '<div id="import-result" style="margin-top:0.5rem;font-size:0.9rem;"></div>'+
-      '</div>'+
-      '<div class="stat-card" style="border-color:rgba(255,0,85,0.3);"><h3 style="margin-bottom:1rem;color:var(--neon-red);">⚠️ Опасная зона</h3><button class="btn btn-danger" id="clear-all-btn">🗑️ Удалить всё</button></div>'+
-    '</section>';
+    let html = '<section class="section"><div class="section-header"><h2>⚙️ Настройки</h2></div>';
+    html += '<div class="notif-section"><h3>👤 Аккаунт</h3>';
+    html += '<div style="margin-bottom: 1rem;"><span style="color: var(--text-secondary); font-size: 0.9rem;">Email: </span>';
+    html += '<span class="notif-status '+(isAuth ? 'enabled' : 'disabled')+'">'+userEmail+'</span></div>';
+    html += '<button class="btn btn-secondary" id="logout-btn" style="margin-bottom: 1rem;">🚪 Выйти</button></div>';
+    html += '<div class="notif-section"><h3>🔔 Уведомления и алерты</h3>';
+    html += '<div style="margin-bottom: 1rem;"><span style="color: var(--text-secondary); font-size: 0.9rem;">Статус: </span>';
+    html += '<span class="notif-status '+(notifEnabled ? 'enabled' : 'disabled')+'">'+(notifEnabled ? '✅ Включены' : '❌ Выключены')+'</span></div>';
+    html += '<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">';
+    html += '<button class="btn" id="enable-notif-btn">'+(notifEnabled ? '🔕 Выключить' : '🔔 Включить уведомления')+'</button>';
+    html += '<button class="btn btn-secondary" id="test-notif-btn">🧪 Тест</button></div>';
+    html += '<div class="notif-row"><label>Алерты по ценам (планы)</label><div class="toggle-container"><button class="toggle '+(ns.priceAlerts ? 'active' : '')+'" data-alert="priceAlerts"></button></div></div>';
+    html += '<div class="notif-row"><label>Алерты по портфелю</label><div class="toggle-container"><button class="toggle '+(ns.portfolioAlerts ? 'active' : '')+'" data-alert="portfolioAlerts"></button></div></div>';
+    html += '<div class="notif-row"><label>Напоминания</label><div class="toggle-container"><button class="toggle '+(ns.reminders ? 'active' : '')+'" data-alert="reminders"></button></div></div>';
+    html += '<div class="notif-row"><label>Звук</label><div class="toggle-container"><button class="toggle '+(ns.sound ? 'active' : '')+'" data-alert="sound"></button></div></div>';
+    html += '<div class="notif-row"><label>Просадка портфеля (%)</label><input type="number" id="alert-drawdown" value="'+ns.drawdownPercent+'" min="1" max="50"></div>';
+    html += '<div class="notif-row"><label>Серия убытков (сделок)</label><input type="number" id="alert-losing-streak" value="'+ns.losingStreak+'" min="2" max="10"></div>';
+    html += '<div class="notif-row"><label>Дневной лимит убытков (%)</label><input type="number" id="alert-daily-loss" value="'+ns.dailyLossLimit+'" min="1" max="20"></div>';
+    html += '<div class="notif-row"><label>Время напоминания</label><input type="time" id="alert-reminder-time" value="'+ns.reminderTime+'"></div>';
+    html += '<button class="btn" id="save-alert-settings" style="margin-top: 1rem;">💾 Сохранить настройки</button></div>';
+    html += '<div class="stat-card" style="margin-bottom:1rem;"><h3 style="margin-bottom:1rem;">Начальный депозит</h3>';
+    html += '<div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">';
+    html += '<input type="number" id="settings-deposit" class="form-input" value="'+initialDeposit+'" step="any" style="max-width:200px;">';
+    html += '<button class="btn" id="save-deposit-btn">Сохранить</button></div></div>';
+    html += '<div class="stat-card" style="margin-bottom:1rem;"><h3 style="margin-bottom:1rem;">🏷️ Теги</h3>';
+    html += '<div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">';
+    html += '<input type="text" id="new-tag-input" class="form-input" placeholder="Новый тег..." style="max-width:200px;">';
+    html += '<button class="btn" id="add-new-tag-btn">Добавить</button></div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:0.5rem;">';
+    for (let i = 0; i < availableTags.length; i++) {
+      const t = availableTags[i];
+      html += '<span class="tag '+getTagClass(t)+'" style="display:inline-flex;align-items:center;gap:0.3rem;">'+t+'<span class="remove-tag delete-tag-btn" data-tag="'+t+'" style="cursor:pointer;">&times;</span></span>';
+    }
+    html += '</div></div>';
+    html += '<div class="stat-card" style="margin-bottom:1rem;"><h3 style="margin-bottom:1rem;">📦 Экспорт</h3><button class="btn" id="export-btn">📥 Скачать JSON</button></div>';
+    html += '<div class="stat-card" style="margin-bottom:1rem;"><h3 style="margin-bottom:1rem;">📤 Импорт</h3>';
+    html += '<input type="file" id="import-file" accept=".json" style="display:none;">';
+    html += '<button class="btn btn-secondary" id="import-btn">Выбрать файл</button>';
+    html += '<div id="import-result" style="margin-top:0.5rem;font-size:0.9rem;"></div></div>';
+    html += '<div class="stat-card" style="border-color:rgba(255,0,85,0.3);"><h3 style="margin-bottom:1rem;color:var(--neon-red);">⚠️ Опасная зона</h3><button class="btn btn-danger" id="clear-all-btn">🗑️ Удалить всё</button></div>';
+    html += '</section>';
+    
+    m.innerHTML = html;
 
     const imp = document.getElementById('import-file');
     if (imp) imp.addEventListener('change', handleImport);
@@ -841,10 +1009,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const t = await f.text(), d = JSON.parse(t);
       if (!d.trades||!Array.isArray(d.trades)) throw new Error('Неверный формат');
       if (!confirm('Импортировать '+d.trades.length+' сделок?')) { r.textContent='❌ Отменено'; r.style.color='var(--neon-yellow)'; return; }
-      for (const tr of trades) await TradingDB.delete(tr.id);
-      for (const tr of d.trades) await TradingDB.add(tr);
-      if (d.plans) { for (const p of plans) await TradingDB.deletePlan(p.id); for (const p of d.plans) await TradingDB.addPlan(p); }
-      if (d.diaryEntries) { for (const x of diaryEntries) await TradingDB.deleteDiary(x.id); for (const x of d.diaryEntries) await TradingDB.addDiary(x); }
+      for (let i = 0; i < trades.length; i++) await TradingDB.delete(trades[i].id);
+      for (let i = 0; i < d.trades.length; i++) await TradingDB.add(d.trades[i]);
+      if (d.plans) { for (let i = 0; i < plans.length; i++) await TradingDB.deletePlan(plans[i].id); for (let i = 0; i < d.plans.length; i++) await TradingDB.addPlan(d.plans[i]); }
+      if (d.diaryEntries) { for (let i = 0; i < diaryEntries.length; i++) await TradingDB.deleteDiary(diaryEntries[i].id); for (let i = 0; i < d.diaryEntries.length; i++) await TradingDB.addDiary(d.diaryEntries[i]); }
       if (d.initialDeposit!==undefined) { await TradingDB.saveSetting('initialDeposit',d.initialDeposit); initialDeposit=d.initialDeposit; }
       if (d.availableTags) { availableTags=d.availableTags; await TradingDB.saveSetting('availableTags',availableTags); }
       trades=await TradingDB.getAll(); plans=await TradingDB.getAllPlans(); diaryEntries=await TradingDB.getAllDiary();
@@ -854,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch(err) { r.style.color='var(--neon-red)'; r.textContent='❌ Ошибка: '+err.message; }
   }
 
-  function openTradeModal(id = null) {
+  function openTradeModal(id) {
     const title = document.getElementById('modal-title');
     editingTradeId = id; editingPlanId = null; editingDiaryId = null; selectedTags = [];
     const cl = document.querySelector('.checklist-container'); if (cl) cl.remove();
