@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     { key: 'sell', label: 'Продажа токена', category: 'trade', default: true },
     { key: 'swap', label: 'Обмен токена', category: 'trade', default: true },
     { key: 'bot_token_payout', label: 'Выплата токенов из бота', category: 'trade', default: true },
+    { key: 'write_off', label: '💀 Списание токена', category: 'trade', default: true },
     { key: 'earning_invest', label: 'Пополнение бота для заработка', category: 'earning_bot', default: true },
     { key: 'earning_payout', label: 'Выплата из бота для заработка', category: 'earning_bot', default: true },
     { key: 'deposit', label: 'Пополнение', category: 'finance', default: true },
@@ -289,7 +290,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const updateFormUI = (type) => {
     if (!type) return;
-    const isToken = ['buy', 'sell', 'swap'].includes(type);
+    const isToken = ['buy', 'sell', 'swap', 'write_off'].includes(type);
+    const isWriteOff = type === 'write_off';
     const isBotTokenPayout = type === 'bot_token_payout';
     const isEarningBot = ['earning_invest', 'earning_payout'].includes(type);
     const isFinance = ['deposit', 'ad_expense'].includes(type);
@@ -298,8 +300,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.earningBotFields) els.earningBotFields.style.display = 'none';
     if (isToken) {
       if (els.tokenFields) els.tokenFields.style.display = 'grid';
-      if (els.hintQuantity) els.hintQuantity.textContent = 'Сколько токенов';
-      if (els.hintUsdt) els.hintUsdt.textContent = 'Сумма в USDT';
+      if (isWriteOff) {
+        if (els.hintQuantity) els.hintQuantity.textContent = 'Сколько списать токенов';
+        if (els.hintUsdt) els.hintUsdt.textContent = 'Остаточная стоимость (0 = полный убыток)';
+      } else {
+        if (els.hintQuantity) els.hintQuantity.textContent = 'Сколько токенов';
+        if (els.hintUsdt) els.hintUsdt.textContent = 'Сумма в USDT';
+      }
       if (els.usdtInput) {
         els.usdtInput.readOnly = false;
         els.usdtInput.style.opacity = '1';
@@ -363,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeSelect) {
     typeSelect.addEventListener('selectchange', (e) => updateFormUI(e.detail.value));
   }
+  // FIFO с сортировкой по дате + времени + поддержка write_off
   const calculateOpenPositions = (txs) => {
     const openBuys = [];
     let totalOpenQty = 0;
@@ -372,10 +380,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const dateB = new Date((b.date || '') + 'T' + (b.time || '00:00'));
       if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
       return (a.createdAt || 0) - (b.createdAt || 0);
-    });
-    console.log('=== FIFO расчёт ===');
-    sorted.forEach(tx => {
-      console.log(`${tx.date} ${tx.time || '00:00'} ${tx.type} ${tx.quantity}`);
     });
     sorted.forEach(tx => {
       if (tx.type === 'buy') {
@@ -393,23 +397,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         totalOpenQty += qty;
         totalOpenInvested += usdt;
-      } else if (tx.type === 'sell' || tx.type === 'swap') {
-        const sellQty = parseFloat(tx.quantity) || 0;
-        let remainingToSell = sellQty;
-        while (remainingToSell > 0 && openBuys.length > 0) {
+      } else if (tx.type === 'sell' || tx.type === 'swap' || tx.type === 'write_off') {
+        const closeQty = parseFloat(tx.quantity) || 0;
+        let remainingToClose = closeQty;
+        while (remainingToClose > 0 && openBuys.length > 0) {
           const buy = openBuys[0];
-          const closeQty = Math.min(buy.remaining, remainingToSell);
-          buy.remaining -= closeQty;
-          totalOpenQty -= closeQty;
-          totalOpenInvested -= closeQty * buy.price;
-          remainingToSell -= closeQty;
+          const doClose = Math.min(buy.remaining, remainingToClose);
+          buy.remaining -= doClose;
+          totalOpenQty -= doClose;
+          totalOpenInvested -= doClose * buy.price;
+          remainingToClose -= doClose;
           if (buy.remaining <= 0.0001) {
             openBuys.shift();
           }
         }
       }
     });
-    console.log('Открытые позиции:', openBuys.length, 'штук');
     return {
       openBuys: openBuys.filter(b => b.remaining > 0.0001),
       totalOpenQty,
@@ -420,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const aggregateTokens = (txs) => {
     const tokens = {};
     txs.forEach(tx => {
-      if (!['buy', 'sell', 'swap', 'bot_token_payout'].includes(tx.type)) return;
+      if (!['buy', 'sell', 'swap', 'bot_token_payout', 'write_off'].includes(tx.type)) return;
       const name = (tx.name || 'Неизвестно').toUpperCase();
       if (!tokens[name]) {
         tokens[name] = { 
@@ -431,6 +434,9 @@ document.addEventListener('DOMContentLoaded', () => {
           totalBoughtQty: 0,
           botPayoutQty: 0,
           botPayoutCount: 0,
+          writeOffQty: 0,
+          writeOffCount: 0,
+          writeOffTotal: 0,
           buyHistory: [],
           operations: []
         };
@@ -459,6 +465,12 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (tx.type === 'sell' || tx.type === 'swap') {
         t.quantity -= qty;
         t.sellCount++;
+      } else if (tx.type === 'write_off') {
+        t.quantity -= qty;
+        t.sellCount++;
+        t.writeOffQty = (t.writeOffQty || 0) + qty;
+        t.writeOffCount = (t.writeOffCount || 0) + 1;
+        t.writeOffTotal = (t.writeOffTotal || 0) + usdt;
       }
     });
     return Object.values(tokens).map(t => {
@@ -468,7 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const opUsdt = parseFloat(op.usdtValue) || 0;
         if (op.type === 'buy') {
           totalBought += opUsdt;
-        } else if (op.type === 'sell' || op.type === 'swap') {
+        } else if (op.type === 'sell' || op.type === 'swap' || op.type === 'write_off') {
           totalSold += opUsdt;
         }
       });
@@ -482,6 +494,8 @@ document.addEventListener('DOMContentLoaded', () => {
       t.lastBuys = t.buyHistory.slice(0, 3);
       const openPositions = calculateOpenPositions(t.operations);
       t.openPositions = openPositions;
+      t.hasWriteOff = (t.writeOffCount || 0) > 0;
+      t.isArchived = t.quantity <= 0.0001 && t.hasWriteOff;
       t.category = 'token';
       return t;
     });
@@ -531,10 +545,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const calculateStats = (txs) => {
     let tokenBought = 0, tokenSold = 0;
-    txs.filter(tx => ['buy', 'sell', 'swap'].includes(tx.type)).forEach(tx => {
+    txs.filter(tx => ['buy', 'sell', 'swap', 'write_off'].includes(tx.type)).forEach(tx => {
       const usdt = parseFloat(tx.usdtValue) || 0;
       if (tx.type === 'buy') tokenBought += usdt;
-      else if (tx.type === 'sell' || tx.type === 'swap') tokenSold += usdt;
+      else if (tx.type === 'sell' || tx.type === 'swap' || tx.type === 'write_off') tokenSold += usdt;
     });
     const tokenProfit = tokenSold - tokenBought;
     let botInvestedUSDT = 0, botReturnedUSDT = 0;
@@ -566,7 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalBought = 0;
     filtered.forEach(tx => {
       const usdt = parseFloat(tx.usdtValue) || 0;
-      if (tx.type === 'sell' || tx.type === 'swap') {
+      if (tx.type === 'sell' || tx.type === 'swap' || tx.type === 'write_off') {
         totalSold += usdt;
       } else if (tx.type === 'buy') {
         totalBought += usdt;
@@ -577,6 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const getBadgeClass = (type) => {
     if (['buy', 'sell', 'swap'].includes(type)) return 'badge-trade';
     if (type === 'bot_token_payout') return 'badge-bot-payout';
+    if (type === 'write_off') return 'badge-writeoff';
     if (type === 'ad_expense') return 'badge-ad';
     if (type === 'deposit') return 'badge-deposit';
     if (type === 'earning_invest') return 'badge-earning';
@@ -588,6 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isFinance = ['deposit', 'ad_expense'].includes(tx.type);
     const isToken = ['buy', 'sell', 'swap'].includes(tx.type);
     const isBotTokenPayout = tx.type === 'bot_token_payout';
+    const isWriteOff = tx.type === 'write_off';
     let usdt = 0;
     let displayText = '';
     let isPositive = false;
@@ -616,6 +632,12 @@ document.addEventListener('DOMContentLoaded', () => {
       displayText = `${qtyText}${priceText}`;
       isPositive = tx.type === 'sell';
       isNegative = tx.type === 'buy';
+    } else if (isWriteOff) {
+      usdt = parseFloat(tx.usdtValue) || 0;
+      const qty = parseFloat(tx.quantity) || 0;
+      displayText = `💀 ${qty.toLocaleString('en-US')} ${tx.name || ''}`;
+      if (tx.archiveReason) displayText += ` • ${tx.archiveReason}`;
+      isNegative = true;
     }
     const typeLabel = getTypeLabel(tx.type);
     const amountDisplay = isBotTokenPayout 
@@ -628,6 +650,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         statusBadge = '<span class="tx-status closed">✅ Закрыто</span>';
       }
+    } else if (tx.type === 'write_off') {
+      statusBadge = '<span class="tx-status archived">💀 Списано</span>';
     }
     let currentPriceInfo = '';
     if (tx.type === 'buy' && openBuyIds.has(tx.id)) {
@@ -647,8 +671,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     const timeDisplay = tx.time ? ` ${tx.time}` : '';
+    const itemClass = tx.type === 'buy' && openBuyIds.has(tx.id) ? 'tx-open' : (tx.type === 'write_off' ? 'tx-writeoff' : '');
     return `
-      <article class="tx-item ${tx.type === 'buy' && openBuyIds.has(tx.id) ? 'tx-open' : ''}">
+      <article class="tx-item ${itemClass}">
         <div class="tx-info">
           <h4><span class="tx-badge ${getBadgeClass(tx.type)}">${typeLabel}</span> ${tx.name || 'Без названия'} ${statusBadge}</h4>
           <div class="tx-meta">${tx.date}${timeDisplay} • ${displayText}</div>
@@ -680,7 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtered = filterByPeriod(transactions);
     const stats = calculateStats(filtered);
     const allAssets = aggregateTokens(filtered);
-    const tokens = allAssets.filter(t => t.quantity > 0);
+    const tokens = allAssets.filter(t => t.quantity > 0 && !t.isArchived);
     let totalUnrealizedInvested = 0;
     let totalUnrealizedQty = 0;
     tokens.forEach(t => {
@@ -776,22 +801,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
               `;
             }
+            const writeOffBtn = (t.openPositions && t.openPositions.totalOpenQty > 0) 
+              ? `<button class="tx-action-btn writeoff" data-writeoff="${encodeURIComponent(t.name)}" title="Списать позицию" style="margin-top: 0.5rem; font-size: 0.75rem;">💀 Списать</button>`
+              : '';
             return `
-              <a href="#/token/${encodeURIComponent(t.name)}" class="token-item">
-                <div class="token-info">
-                  <div class="token-icon">${t.name.substring(0, 2)}</div>
-                  <div>
-                    <div class="token-name">${t.name}</div>
-                    <div class="token-sub">Количество: ${parseFloat(t.quantity).toLocaleString('en-US')}</div>
-                    <div class="token-sub">Цена покупки: ${formatPrice(avgPrice)}</div>
-                    ${openPositionHtml}
-                    ${currentPriceHtml}
+              <div class="token-item-wrapper" style="position: relative;">
+                <a href="#/token/${encodeURIComponent(t.name)}" class="token-item" style="display: flex; text-decoration: none; color: inherit;">
+                  <div class="token-info">
+                    <div class="token-icon">${t.name.substring(0, 2)}</div>
+                    <div style="flex: 1;">
+                      <div class="token-name">${t.name}</div>
+                      <div class="token-sub">Количество: ${parseFloat(t.quantity).toLocaleString('en-US')}</div>
+                      <div class="token-sub">Цена покупки: ${formatPrice(avgPrice)}</div>
+                      ${openPositionHtml}
+                      ${currentPriceHtml}
+                    </div>
                   </div>
-                </div>
-                <div class="token-stats">
-                  <div class="token-value" style="color: ${t.invested > 0 ? 'var(--neon-red)' : 'var(--text-primary)'};">${formatMoneyPlain(t.invested)}</div>
-                </div>
-              </a>
+                  <div class="token-stats">
+                    <div class="token-value" style="color: ${t.invested > 0 ? 'var(--neon-red)' : 'var(--text-primary)'};">${formatMoneyPlain(t.invested)}</div>
+                  </div>
+                </a>
+                ${writeOffBtn}
+              </div>
             `;
           }).join('') : '<div class="empty-state">Нет купленных токенов</div>'}
         </div>
@@ -832,11 +863,11 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="token-list">
         ${filtered.length > 0 ? filtered.map(t => `
-          <a href="#/token/${encodeURIComponent(t.name)}" class="token-item">
+          <a href="#/token/${encodeURIComponent(t.name)}" class="token-item ${t.isArchived ? 'archived' : ''}">
             <div class="token-info">
-              <div class="token-icon">${t.name.substring(0, 2)}</div>
+              <div class="token-icon ${t.isArchived ? 'archived-icon' : ''}">${t.name.substring(0, 2)}</div>
               <div>
-                <div class="token-name">${t.name}</div>
+                <div class="token-name">${t.name} ${t.isArchived ? '<span style="font-size:0.7rem; color: var(--neon-red);">💀 Списан</span>' : ''}</div>
                 <div class="token-sub">Кол-во: ${parseFloat(t.quantity).toLocaleString('en-US')}</div>
               </div>
             </div>
@@ -851,7 +882,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const renderTokenDetailView = (tokenName) => {
     const name = decodeURIComponent(tokenName).toUpperCase();
-    const tokenTxs = transactions.filter(tx => (tx.name || '').toUpperCase() === name && ['buy', 'sell', 'swap', 'bot_token_payout'].includes(tx.type));
+    const tokenTxs = transactions.filter(tx => (tx.name || '').toUpperCase() === name && ['buy', 'sell', 'swap', 'bot_token_payout', 'write_off'].includes(tx.type));
     if (tokenTxs.length === 0) {
       return `<button class="back-btn" onclick="history.back()">← Назад</button><div class="empty-state">Токен не найден</div>`;
     }
@@ -874,6 +905,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <label>Выведено из ботов</label>
         <div class="value" style="color: var(--neon-green);">${parseFloat(aggregated.botPayoutQty).toLocaleString('en-US')}</div>
         <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">${aggregated.botPayoutCount || 0} выплат</div>
+      </div>
+    ` : '';
+    const writeOffHtml = aggregated.writeOffQty > 0 ? `
+      <div class="detail-card" style="border-color: rgba(255, 0, 85, 0.3); background: rgba(255, 0, 85, 0.05);">
+        <label style="color: var(--neon-red);">💀 Списано</label>
+        <div class="value" style="color: var(--neon-red);">${parseFloat(aggregated.writeOffQty).toLocaleString('en-US')}</div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">${aggregated.writeOffCount || 0} списаний • Убыток: ${formatMoney(-aggregated.writeOffTotal)}</div>
       </div>
     ` : '';
     const openPositions = aggregated.openPositions || { openBuys: [], totalOpenQty: 0, totalOpenInvested: 0, avgOpenPrice: 0 };
@@ -907,6 +945,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <span style="color: var(--text-secondary); font-size: 0.85rem;">Вложено:</span>
               <span style="font-weight: 600; color: var(--neon-red);">${formatMoneyPlain(openPositions.totalOpenInvested)}</span>
             </div>
+            <button class="submit-btn danger" id="write-off-btn" style="margin-top: 0.75rem; width: 100%;">💀 Списать позицию</button>
           </div>
         </div>
       `;
@@ -915,9 +954,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return `
       <button class="back-btn" onclick="history.back()">← Назад</button>
       <div class="token-detail-header">
-        <div class="token-icon">${name.substring(0, 2)}</div>
+        <div class="token-icon ${aggregated.isArchived ? 'archived-icon' : ''}">${name.substring(0, 2)}</div>
         <div>
-          <h1>${name}</h1>
+          <h1>${name} ${aggregated.isArchived ? '<span style="font-size:0.9rem; color: var(--neon-red);">💀 Списан</span>' : ''}</h1>
           <p style="color: var(--text-secondary);">Токен • ${aggregated.operations.length} операций</p>
         </div>
       </div>
@@ -940,6 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         ${currentPriceCardHtml}
         ${botPayoutHtml}
+        ${writeOffHtml}
         ${openPositionsHtml}
       </section>
       <section class="section">
@@ -971,21 +1011,73 @@ document.addEventListener('DOMContentLoaded', () => {
       </section>
     `;
   };
+  const renderArchiveView = () => {
+    const allAssets = aggregateTokens(transactions);
+    const archived = allAssets.filter(t => t.isArchived);
+    const totalWriteOffLoss = archived.reduce((sum, t) => sum + (t.writeOffTotal || 0), 0);
+    const totalWriteOffQty = archived.reduce((sum, t) => sum + (t.writeOffQty || 0), 0);
+    return `
+      <header class="page-header">
+        <h1>📦 Архив токенов</h1>
+        <p>Списанные позиции и зафиксированные убытки</p>
+      </header>
+      <section class="stats-grid">
+        <article class="stat-card archive-stats">
+          <h3>Всего списано</h3>
+          <p class="metric-value">${archived.length}</p>
+        </article>
+        <article class="stat-card archive-stats">
+          <h3>Общий объём списаний</h3>
+          <p class="metric-value">${totalWriteOffQty.toLocaleString('en-US')} шт</p>
+        </article>
+        <article class="stat-card archive-stats">
+          <h3>Зафиксированный убыток</h3>
+          <p class="metric-value negative">${formatMoney(-totalWriteOffLoss)}</p>
+        </article>
+      </section>
+      <div class="token-list">
+        ${archived.length > 0 ? archived.map(t => {
+          const lastWriteOff = [...t.operations].filter(op => op.type === 'write_off').sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+          const firstBuy = [...t.operations].filter(op => op.type === 'buy').sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+          const lossAmount = (t.totalBought || 0) - (t.totalSold || 0);
+          return `
+            <div class="token-item archived">
+              <div class="token-info">
+                <div class="token-icon archived-icon">${t.name.substring(0, 2)}</div>
+                <div>
+                  <div class="token-name">${t.name} <span style="font-size:0.75rem; color: var(--neon-red);">💀 Списан</span></div>
+                  <div class="token-sub">Куплен: ${firstBuy ? firstBuy.date : '—'} • Списан: ${lastWriteOff ? lastWriteOff.date : '—'}</div>
+                  <div class="token-sub">Вложено: ${formatMoneyPlain(t.totalBought || 0)} • Списано: ${parseFloat(t.writeOffQty || 0).toLocaleString('en-US')} шт</div>
+                  ${lastWriteOff && lastWriteOff.archiveReason ? `<div class="token-sub" style="color: var(--neon-red);">Причина: ${lastWriteOff.archiveReason}</div>` : ''}
+                </div>
+              </div>
+              <div class="token-stats">
+                <div class="token-value negative">${formatMoney(-lossAmount)}</div>
+                <div class="token-profit neg">Убыток</div>
+                <button class="tx-action-btn restore" data-restore="${encodeURIComponent(t.name)}" title="Восстановить" style="margin-top: 0.5rem; font-size: 0.75rem;">🔄 Вернуть</button>
+              </div>
+            </div>
+          `;
+        }).join('') : '<div class="empty-state">Архив пуст. Здесь будут появляться списанные токены.</div>'}
+      </div>
+    `;
+  };
   const renderTradingView = () => {
     const allAssets = aggregateTokens(transactions);
+    const active = allAssets.filter(t => !t.isArchived);
     return `
       <header class="page-header">
         <h1>Трейдинг</h1>
         <p>Покупки, продажи и обмены</p>
       </header>
       <div class="token-list">
-        ${allAssets.length > 0 ? allAssets.map(t => `
+        ${active.length > 0 ? active.map(t => `
           <a href="#/token/${encodeURIComponent(t.name)}" class="token-item">
             <div class="token-info">
               <div class="token-icon">${t.name.substring(0, 2)}</div>
               <div>
                 <div class="token-name">${t.name}</div>
-                <div class="token-sub">${t.buyCount} покупок • ${t.sellCount} продаж</div>
+                <div class="token-sub">${t.buyCount} покупок • ${t.sellCount} продаж${t.writeOffCount > 0 ? ` • ${t.writeOffCount} списаний` : ''}</div>
               </div>
             </div>
             <div class="token-stats">
@@ -1071,6 +1163,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.main.innerHTML = renderPortfolioView();
     bindPeriodFilter();
     bindTxActions();
+    bindWriteOffButtons();
   });
   Router.register('#/tokens', () => {
     els.main.innerHTML = renderTokensView();
@@ -1080,9 +1173,14 @@ document.addEventListener('DOMContentLoaded', () => {
   Router.register('#/token', (params) => {
     els.main.innerHTML = renderTokenDetailView(params[0] || '');
     bindTxActions();
+    bindWriteOffButtonInDetail();
   });
   Router.register('#/trading', () => {
     els.main.innerHTML = renderTradingView();
+  });
+  Router.register('#/archive', () => {
+    els.main.innerHTML = renderArchiveView();
+    bindRestoreButtons();
   });
   Router.register('#/settings', () => {
     els.main.innerHTML = renderSettingsView();
@@ -1101,6 +1199,7 @@ document.addEventListener('DOMContentLoaded', () => {
         els.main.innerHTML = renderPortfolioView();
         bindPeriodFilter();
         bindTxActions();
+        bindWriteOffButtons();
       });
     });
   };
@@ -1154,6 +1253,173 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   };
+  const bindWriteOffButtons = () => {
+    document.querySelectorAll('[data-writeoff]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tokenName = decodeURIComponent(btn.dataset.writeoff);
+        openWriteOffModal(tokenName);
+      });
+    });
+  };
+  const bindWriteOffButtonInDetail = () => {
+    const btn = document.getElementById('write-off-btn');
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const nameMatch = els.main.innerHTML.match(/<h1>([^<]+)</);
+        const tokenName = nameMatch ? decodeURIComponent(nameMatch[1]).replace(/<[^>]+>/g, '').trim() : '';
+        if (tokenName) openWriteOffModal(tokenName);
+      });
+    }
+  };
+  const bindRestoreButtons = () => {
+    document.querySelectorAll('[data-restore]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tokenName = decodeURIComponent(btn.dataset.restore);
+        await restoreFromArchive(tokenName);
+      });
+    });
+  };
+  const openWriteOffModal = (tokenName) => {
+    const allAssets = aggregateTokens(transactions);
+    const token = allAssets.find(t => t.name === tokenName);
+    if (!token) {
+      alert('Токен не найден');
+      return;
+    }
+    const openQty = token.openPositions?.totalOpenQty || 0;
+    const openInvested = token.openPositions?.totalOpenInvested || 0;
+    if (openQty <= 0) {
+      alert('Нет открытых позиций для списания');
+      return;
+    }
+    const modal = document.createElement('dialog');
+    modal.id = 'writeoff-modal';
+    modal.innerHTML = `
+      <div class="modal-header">
+        <h2>💀 Списание ${tokenName}</h2>
+        <button class="close-btn" id="close-writeoff-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="writeoff-info">
+          <strong>Открытая позиция:</strong> ${openQty.toLocaleString('en-US')} ${tokenName}<br>
+          <strong>Вложено:</strong> ${formatMoneyPlain(openInvested)}<br>
+          <span style="font-size: 0.8rem; margin-top: 0.5rem; display: block;">
+            ⚠️ Списание зафиксирует убыток и закроет позицию. Данные останутся в статистике.
+          </span>
+        </div>
+        <div class="form-group">
+          <label>Количество для списания</label>
+          <input type="number" id="writeoff-qty" class="form-input" value="${openQty}" step="any" max="${openQty}">
+          <span class="form-hint">Максимум: ${openQty.toLocaleString('en-US')}</span>
+        </div>
+        <div class="form-group">
+          <label>Остаточная стоимость (USDT)</label>
+          <input type="number" id="writeoff-value" class="form-input" value="0" step="any">
+          <span class="form-hint">0 = полный убыток. Укажите остаток если продали часть.</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Дата списания</label>
+            <input type="date" id="writeoff-date" class="form-input" value="${new Date().toISOString().split('T')[0]}">
+          </div>
+          <div class="form-group">
+            <label>Время</label>
+            <input type="time" id="writeoff-time" class="form-input" value="${new Date().toTimeString().slice(0, 5)}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Причина списания (необязательно)</label>
+          <select id="writeoff-reason" class="form-input">
+            <option value="">— Выбрать причину —</option>
+            <option value="Rug pull">Rug pull (мошенничество)</option>
+            <option value="Проект мёртв">Проект мёртв</option>
+            <option value="Нет ликвидности">Нет ликвидности</option>
+            <option value="Долгосрочный убыток">Долгосрочный убыток</option>
+            <option value="Другое">Другое</option>
+          </select>
+        </div>
+        <div class="form-group" id="custom-reason-group" style="display: none;">
+          <label>Своя причина</label>
+          <input type="text" id="writeoff-custom-reason" class="form-input" placeholder="Опишите причину...">
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+          <button class="submit-btn danger" id="confirm-writeoff-btn" style="flex: 1;">💀 Подтвердить списание</button>
+          <button class="submit-btn secondary" id="cancel-writeoff-btn" style="flex: 1;">Отмена</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.showModal();
+    document.getElementById('close-writeoff-modal').onclick = () => modal.close();
+    document.getElementById('cancel-writeoff-btn').onclick = () => modal.close();
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+    document.getElementById('writeoff-reason').addEventListener('change', (e) => {
+      document.getElementById('custom-reason-group').style.display = e.target.value === 'Другое' ? 'block' : 'none';
+    });
+    document.getElementById('confirm-writeoff-btn').onclick = async () => {
+      const qty = parseFloat(document.getElementById('writeoff-qty').value) || 0;
+      const value = parseFloat(document.getElementById('writeoff-value').value) || 0;
+      const date = document.getElementById('writeoff-date').value;
+      const time = document.getElementById('writeoff-time').value;
+      const reasonSelect = document.getElementById('writeoff-reason').value;
+      const customReason = document.getElementById('writeoff-custom-reason').value.trim();
+      const reason = reasonSelect === 'Другое' ? customReason : reasonSelect;
+      if (qty <= 0) {
+        alert('Укажите количество');
+        return;
+      }
+      if (qty > openQty) {
+        alert(`Нельзя списать больше чем открыто (${openQty})`);
+        return;
+      }
+      if (!date) {
+        alert('Укажите дату');
+        return;
+      }
+      if (!confirm(`Списать ${qty.toLocaleString('en-US')} ${tokenName}?\nУбыток: ${formatMoney(-(openInvested - value))}\n\nЭто действие нельзя отменить (но можно восстановить из архива).`)) {
+        return;
+      }
+      const txData = {
+        id: crypto.randomUUID(),
+        type: 'write_off',
+        name: tokenName,
+        quantity: qty,
+        usdtValue: value,
+        rate: qty > 0 ? value / qty : 0,
+        date,
+        time,
+        notes: reason ? `Списание: ${reason}` : '',
+        archiveReason: reason || null,
+        archivePrice: value,
+        createdAt: Date.now()
+      };
+      await DB.add(txData);
+      transactions.push(txData);
+      modal.close();
+      modal.remove();
+      Router.resolve();
+    };
+  };
+  const restoreFromArchive = async (tokenName) => {
+    const tokenTxs = transactions.filter(tx => (tx.name || '').toUpperCase() === tokenName.toUpperCase());
+    const writeOffs = tokenTxs.filter(tx => tx.type === 'write_off').sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (writeOffs.length === 0) {
+      alert('Нет операций списания для восстановления');
+      return;
+    }
+    const lastWriteOff = writeOffs[0];
+    if (!confirm(`Восстановить токен ${tokenName}?\nБудет удалена последняя операция списания от ${lastWriteOff.date}.\n\nТокен вернётся в портфель как открытая позиция.`)) {
+      return;
+    }
+    await DB.delete(lastWriteOff.id);
+    transactions = transactions.filter(tx => tx.id !== lastWriteOff.id);
+    Router.resolve();
+  };
   const bindSettingsActions = () => {
     const addBtn = document.getElementById('add-type-btn');
     if (addBtn) {
@@ -1206,7 +1472,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tx-date').value = tx.date || '';
     if (els.timeInput) els.timeInput.value = tx.time || '';
     document.getElementById('tx-notes').value = tx.notes || '';
-    const isToken = ['buy', 'sell', 'swap'].includes(tx.type);
+    const isToken = ['buy', 'sell', 'swap', 'write_off'].includes(tx.type);
     const isBotTokenPayout = tx.type === 'bot_token_payout';
     const isEarningBot = ['earning_invest', 'earning_payout'].includes(tx.type);
     const isFinance = ['deposit', 'ad_expense'].includes(tx.type);
@@ -1256,15 +1522,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const notes = formData.get('notes') || '';
     let quantity = 0, usdtValue = 0, rate = 0;
     let botAmount = 0, botCurrency = 'USDT';
-    const isToken = ['buy', 'sell', 'swap'].includes(type);
+    const isToken = ['buy', 'sell', 'swap', 'write_off'].includes(type);
+    const isWriteOff = type === 'write_off';
     const isBotTokenPayout = type === 'bot_token_payout';
     const isEarningBot = ['earning_invest', 'earning_payout'].includes(type);
     const isFinance = ['deposit', 'ad_expense'].includes(type);
     if (isToken) {
       quantity = parseFloat(formData.get('quantity')) || 0;
       usdtValue = parseFloat(formData.get('usdt')) || 0;
-      if (quantity <= 0 || usdtValue <= 0) return alert('Укажите количество и сумму');
-      rate = usdtValue / quantity;
+      if (quantity <= 0) return alert('Укажите количество');
+      if (!isWriteOff && usdtValue <= 0) return alert('Укажите сумму');
+      rate = quantity > 0 ? usdtValue / quantity : 0;
     } else if (isBotTokenPayout) {
       quantity = parseFloat(formData.get('quantity')) || 0;
       usdtValue = 0;
@@ -1328,26 +1596,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const init = async () => {
     try {
-      // ПРОВЕРКА АВТОРИЗАЦИИ FIREBASE (ДОБАВЛЕНО)
-      if (typeof FirebaseClient !== 'undefined') {
-        await FirebaseClient.init();
-        await new Promise(resolve => FirebaseClient.onAuthReady(() => resolve()));
-        
-        if (!FirebaseClient.isAuthenticated()) {
-          const isGuest = localStorage.getItem('guest_mode') === 'true';
-          if (!isGuest) {
-            window.location.href = 'auth.html';
-            return;
-          }
-        }
-        
-        // МИГРАЦИЯ ТОКЕНОВ (ДОБАВЛЕНО)
-        if (FirebaseClient.isAuthenticated()) {
-          console.log('🔄 Миграция токенов...');
-          await FirebaseClient.migrateTokensFromLocalStorage();
-        }
-      }
-
       let storedTypes = await DB.getTypes();
       if (storedTypes.length === 0) {
         for (const t of defaultTypes) await DB.addType(t);
