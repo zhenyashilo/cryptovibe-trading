@@ -86,28 +86,56 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('close-modal').addEventListener('click', () => document.getElementById('trade-modal').close());
   document.getElementById('trade-form').addEventListener('submit', async (e) => { e.preventDefault(); await handleFormSubmit(); });
 
+  // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК КЛИКОВ (использует closest для надёжности)
   document.getElementById('main-content').addEventListener('click', async (e) => {
+    const deleteTradeBtn = e.target.closest('.delete-trade');
+    if (deleteTradeBtn) {
+      if (confirm('Удалить сделку?')) {
+        await TradingDB.delete(deleteTradeBtn.dataset.id);
+        trades = await TradingDB.getAll();
+        TradingStats.clearCache();
+        handleNavigation();
+      }
+      return;
+    }
+
+    const editTradeBtn = e.target.closest('.edit-trade');
+    if (editTradeBtn) { openTradeModal(editTradeBtn.dataset.id); return; }
+
+    const deletePlanBtn = e.target.closest('.delete-plan');
+    if (deletePlanBtn) {
+      if (confirm('Удалить план?')) {
+        await TradingDB.deletePlan(deletePlanBtn.dataset.id);
+        plans = await TradingDB.getAllPlans();
+        handleNavigation();
+      }
+      return;
+    }
+
+    const editPlanBtn = e.target.closest('.edit-plan');
+    if (editPlanBtn) { openPlanModal(editPlanBtn.dataset.id); return; }
+
+    const deleteDiaryBtn = e.target.closest('.delete-diary');
+    if (deleteDiaryBtn) {
+      if (confirm('Удалить запись?')) {
+        await TradingDB.deleteDiary(deleteDiaryBtn.dataset.id);
+        diaryEntries = await TradingDB.getAllDiary();
+        handleNavigation();
+      }
+      return;
+    }
+
+    const editDiaryBtn = e.target.closest('.edit-diary');
+    if (editDiaryBtn) { openDiaryModal(editDiaryBtn.dataset.id); return; }
+
+    const completePlanBtn = e.target.closest('.complete-plan');
+    if (completePlanBtn) { openPlanModal(completePlanBtn.dataset.id, true); return; }
+
     const t = e.target;
     if (t.id === 'add-trade-btn') { openTradeModal(); return; }
     if (t.id === 'add-plan-btn') { openPlanModal(); return; }
     if (t.id === 'add-diary-btn') { openDiaryModal(); return; }
-    if (t.classList.contains('edit-trade')) { openTradeModal(t.dataset.id); return; }
-    if (t.classList.contains('edit-plan')) { openPlanModal(t.dataset.id); return; }
-    if (t.classList.contains('edit-diary')) { openDiaryModal(t.dataset.id); return; }
     
-    if (t.classList.contains('delete-trade')) {
-      if (confirm('Удалить сделку?')) { await TradingDB.delete(t.dataset.id); trades = await TradingDB.getAll(); TradingStats.clearCache(); handleNavigation(); }
-      return;
-    }
-    if (t.classList.contains('delete-plan')) {
-      if (confirm('Удалить план?')) { await TradingDB.deletePlan(t.dataset.id); plans = await TradingDB.getAllPlans(); handleNavigation(); }
-      return;
-    }
-    if (t.classList.contains('delete-diary')) {
-      if (confirm('Удалить запись?')) { await TradingDB.deleteDiary(t.dataset.id); diaryEntries = await TradingDB.getAllDiary(); handleNavigation(); }
-      return;
-    }
-    if (t.classList.contains('complete-plan')) { openPlanModal(t.dataset.id, true); return; }
     if (t.classList.contains('period-btn') && !t.classList.contains('plan-filter-btn')) {
       const p = t.dataset.period;
       if (p && p !== currentPeriod) { currentPeriod = p; localStorage.setItem('trading_period', p); TradingStats.clearCache(); handleNavigation(); }
@@ -398,7 +426,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const followed = completed.filter(p => p.followedPlan===true);
     const pwr = completed.length>0 ? (completed.filter(p=>p.actualPnL>0).length/completed.length*100) : 0;
     const pfr = completed.length>0 ? (followed.length/completed.length*100) : 0;
-    
     let html = '<section class="section">';
     html += '<div class="section-header"><h2>📋 Планировщик</h2><button class="btn" id="add-plan-btn">+ Новый план</button></div>';
     html += '<div class="stats-grid" style="margin-bottom:1.5rem;">';
@@ -431,7 +458,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rr = Math.abs(p.plannedEntry-p.plannedSL)>0 ? Math.abs(p.plannedTP-p.plannedEntry)/Math.abs(p.plannedEntry-p.plannedSL) : 0;
     const plannedPnL = (p.plannedTP-p.plannedEntry)*p.positionSize;
     const fLabels = {true:'✅ Да',false:'❌ Нет',partial:'⚠️ Частично'};
-    
     let h = '<div class="plan-card plan-'+p.status+'">';
     h += '<div class="plan-header">';
     h += '<div><span class="plan-title">'+p.token+'</span><span style="margin-left:0.5rem;color:var(--text-secondary);font-size:0.85rem;">'+(p.direction==='long'?'📈 Лонг':'📉 Шорт')+'</span></div>';
@@ -581,7 +607,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const c = document.createElement('div');
     const sorted = [...diaryEntries].sort((a,b) => new Date(b.date)-new Date(a.date));
     const avgEmotion = diaryEntries.length>0 ? (diaryEntries.reduce((s,e)=>s+(e.emotion||5),0)/diaryEntries.length).toFixed(1) : 0;
-    
     let html = '<section class="section">';
     html += '<div class="section-header"><h2>📝 Дневник трейдера</h2><button class="btn" id="add-diary-btn">+ Новая запись</button></div>';
     html += '<div class="diary-stats-grid">';
@@ -605,7 +630,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const em = emotions.find(x=>x.value===e.emotion) || emotions[4];
     const dayTrades = trades.filter(t => t.date === e.date);
     const dayPnL = dayTrades.reduce((s,t) => s + TradingStats.calculatePnL(t), 0);
-    
     let h = '<div class="diary-card">';
     h += '<div class="diary-header">';
     h += '<div><span class="diary-date">'+e.date+'</span> <span style="font-size:2rem;margin-left:0.5rem;">'+em.emoji+'</span> <span style="color:var(--text-secondary);font-size:0.9rem;">'+em.label+' ('+e.emotion+'/10)</span></div>';
@@ -694,7 +718,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const s = TradingStats.calculate(f, initialDeposit);
     const c = document.createElement('div');
     const tokenStats = {}, tagStats = {};
-    
     for (let i = 0; i < f.length; i++) {
       const t = f[i];
       const tk = t.token.toUpperCase();
@@ -702,7 +725,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const pnl = TradingStats.calculatePnL(t);
       tokenStats[tk].trades++; tokenStats[tk].profit += pnl;
       if (pnl > 0) tokenStats[tk].wins++; else if (pnl < 0) tokenStats[tk].losses++;
-      
       if (t.tags) {
         for (let j = 0; j < t.tags.length; j++) {
           const tagKey = t.tags[j].toLowerCase();
@@ -712,19 +734,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
     }
-    
     const tsa = Object.entries(tokenStats).map(([k,v])=>({token:k,...v})).sort((a,b)=>b.profit-a.profit);
     const tsa2 = Object.entries(tagStats).map(([k,v])=>({tag:v.original||k,...v})).sort((a,b)=>b.profit-a.profit);
     const eq = calculateEquityCurve(f);
     const withPnl = f.map(t=>({...t,pnl:TradingStats.calculatePnL(t)})).sort((a,b)=>b.pnl-a.pnl);
     const best = withPnl.filter(t=>t.pnl>0).slice(0,5);
     const worst = withPnl.filter(t=>t.pnl<0).slice(0,5);
-    
     let html = renderPeriodFilter() + renderTagFilter();
-    
     html += '<section class="section"><div class="section-header"><h2>📈 Equity Curve</h2></div>';
     html += '<div class="stat-card" style="padding:1.5rem;"><canvas id="equity-chart" width="800" height="300" style="width:100%;height:300px;"></canvas></div></section>';
-    
     html += '<section class="section"><div class="section-header"><h2>📊 Статистика</h2></div><div class="stats-grid">';
     html += '<div class="stat-card"><h3>Средний выигрыш</h3><div class="stat-value positive">'+TradingStats.formatMoney(s.averageWin)+'</div></div>';
     html += '<div class="stat-card"><h3>Средний проигрыш</h3><div class="stat-value negative">-'+TradingStats.formatMoney(s.averageLoss).replace('+','')+'</div></div>';
@@ -733,7 +751,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     html += '<div class="stat-card"><h3>Убыток</h3><div class="stat-value negative">-'+TradingStats.formatMoney(s.totalLoss).replace('+','')+'</div></div>';
     html += '<div class="stat-card"><h3>Депозит</h3><div class="stat-value neutral">$'+initialDeposit.toFixed(2)+'</div></div>';
     html += '</div></section>';
-    
     html += '<section class="section"><div class="section-header"><h2>🏆 По тегам</h2></div><div class="trades-table">';
     if (tsa2.length > 0) {
       html += '<div class="trade-row header"><div>Тег</div><div>Сделок</div><div>Приб</div><div>Убыт</div><div>WR</div><div>Прибыль</div></div>';
@@ -750,7 +767,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += '<div class="empty-state">Нет данных</div>';
     }
     html += '</div></section>';
-    
     html += '<section class="section"><div class="section-header"><h2>🏆 По токенам</h2></div><div class="trades-table">';
     if (tsa.length > 0) {
       html += '<div class="trade-row header"><div>Токен</div><div>Сделок</div><div>Приб</div><div>Убыт</div><div>WR</div><div>Прибыль</div></div>';
@@ -766,7 +782,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += '<div class="empty-state">Нет данных</div>';
     }
     html += '</div></section>';
-    
     html += '<section class="section"><div class="section-header"><h2>📈 Лучшие</h2></div><div class="trades-table">';
     if (best.length > 0) {
       html += '<div class="trade-row header"><div>Дата</div><div>Токен</div><div>Вход/Выход</div><div>Кол-во</div><div></div><div>P&L</div><div></div></div>';
@@ -781,7 +796,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += '<div class="empty-state">Нет прибыльных</div>';
     }
     html += '</div></section>';
-    
     html += '<section class="section"><div class="section-header"><h2>📉 Худшие</h2></div><div class="trades-table">';
     if (worst.length > 0) {
       html += '<div class="trade-row header"><div>Дата</div><div>Токен</div><div>Вход/Выход</div><div>Кол-во</div><div></div><div>P&L</div><div></div></div>';
@@ -796,7 +810,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += '<div class="empty-state">Нет убыточных 🎉</div>';
     }
     html += '</div></section>';
-    
     c.innerHTML = html;
     const main = document.getElementById('main-content'); 
     main.innerHTML = ''; 
@@ -810,8 +823,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let b = initialDeposit;
     for (let i = 0; i < s.length; i++) {
       const t = s[i];
-      const p = TradingStats.calculatePnL(t); 
-      b += p; 
+      const p = TradingStats.calculatePnL(t);
+      b += p;
       d.push({date:t.date.slice(5)+' '+t.time.slice(0,5),balance:b,pnl:p});
     }
     return d;
@@ -949,7 +962,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     html += '<div id="import-result" style="margin-top:0.5rem;font-size:0.9rem;"></div></div>';
     html += '<div class="stat-card" style="border-color:rgba(255,0,85,0.3);"><h3 style="margin-bottom:1rem;color:var(--neon-red);">⚠️ Опасная зона</h3><button class="btn btn-danger" id="clear-all-btn">🗑️ Удалить всё</button></div>';
     html += '</section>';
-    
     m.innerHTML = html;
 
     const imp = document.getElementById('import-file');
