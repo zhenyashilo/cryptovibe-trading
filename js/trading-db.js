@@ -1,5 +1,4 @@
 // TradingDB - работает с Firebase
-
 const TradingDB = {
   DB_NAME: 'CryptoVibeTrading',
   DB_VERSION: 4,
@@ -22,7 +21,6 @@ const TradingDB = {
       }
     }
     
-    // Fallback на IndexedDB
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
       request.onerror = () => reject(request.error);
