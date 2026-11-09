@@ -117,6 +117,15 @@
       background: rgba(188, 19, 254, 0.2);
     }
     
+    .sidebar-link.archive-link {
+      background: rgba(255, 0, 85, 0.08);
+      color: var(--neon-red);
+    }
+    
+    .sidebar-link.archive-link:hover {
+      background: rgba(255, 0, 85, 0.15);
+    }
+    
     .sidebar-link svg { width: 20px; height: 20px; flex-shrink: 0; }
     
     .sidebar-footer {
@@ -288,6 +297,17 @@
       transform: translateX(4px);
     }
     
+    .token-item.archived {
+      border-color: rgba(255, 0, 85, 0.3);
+      background: rgba(255, 0, 85, 0.05);
+      opacity: 0.85;
+    }
+    
+    .token-item.archived:hover {
+      opacity: 1;
+      border-color: rgba(255, 0, 85, 0.5);
+    }
+    
     .token-info {
       display: flex;
       align-items: center;
@@ -307,6 +327,10 @@
       font-size: 0.85rem;
       color: #fff;
       flex-shrink: 0;
+    }
+    
+    .token-icon.archived-icon {
+      background: linear-gradient(135deg, var(--neon-red), #880022);
     }
     
     .token-name { font-weight: 600; font-size: 1rem; }
@@ -413,6 +437,11 @@
       background: rgba(255, 230, 0, 0.05);
     }
     
+    .tx-item.tx-writeoff {
+      border-color: rgba(255, 0, 85, 0.3);
+      background: rgba(255, 0, 85, 0.05);
+    }
+    
     .tx-info { flex: 1; min-width: 0; }
     .tx-info h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.2rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
     .tx-meta { font-size: 0.8rem; color: var(--text-secondary); }
@@ -455,11 +484,17 @@
       color: var(--neon-green);
     }
     
+    .tx-status.archived {
+      background: rgba(255, 0, 85, 0.2);
+      color: var(--neon-red);
+    }
+    
     .badge-trade { background: rgba(0, 243, 255, 0.2); color: var(--neon-cyan); }
     .badge-bot-payout { background: rgba(0, 255, 157, 0.2); color: var(--neon-green); }
     .badge-ad { background: rgba(255, 230, 0, 0.2); color: var(--neon-yellow); }
     .badge-deposit { background: rgba(0, 255, 157, 0.2); color: var(--neon-green); }
     .badge-earning { background: rgba(188, 19, 254, 0.2); color: var(--neon-purple); }
+    .badge-writeoff { background: rgba(255, 0, 85, 0.2); color: var(--neon-red); }
     
     .tx-actions {
       display: flex;
@@ -486,6 +521,18 @@
     .tx-action-btn.delete:hover {
       color: var(--neon-red);
       border-color: var(--neon-red);
+    }
+    
+    .tx-action-btn.writeoff:hover {
+      color: var(--neon-red);
+      border-color: var(--neon-red);
+      background: rgba(255, 0, 85, 0.1);
+    }
+    
+    .tx-action-btn.restore:hover {
+      color: var(--neon-green);
+      border-color: var(--neon-green);
+      background: rgba(0, 255, 157, 0.1);
     }
     
     .fab-container {
@@ -728,6 +775,13 @@
       color: var(--text-primary);
     }
     
+    .submit-btn.danger {
+      background: var(--neon-red);
+      color: #fff;
+    }
+    
+    .submit-btn.danger:hover { filter: brightness(1.15); }
+    
     .empty-state {
       text-align: center;
       padding: 3rem 1rem;
@@ -792,6 +846,24 @@
       margin-bottom: 1rem;
     }
     
+    .writeoff-info {
+      background: rgba(255, 0, 85, 0.08);
+      border: 1px solid rgba(255, 0, 85, 0.3);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    
+    .writeoff-info strong {
+      color: var(--neon-red);
+    }
+    
+    .archive-stats {
+      background: rgba(255, 0, 85, 0.05);
+      border: 1px solid rgba(255, 0, 85, 0.2);
+    }
+    
     @media (max-width: 480px) {
       .form-row { grid-template-columns: 1fr; }
       .metric-value { font-size: 1.5rem; }
@@ -817,6 +889,10 @@
         <a href="#/trading" class="sidebar-link" data-route="trading">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           Трейдинг
+        </a>
+        <a href="#/archive" class="sidebar-link archive-link" data-route="archive">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+          Архив
         </a>
         <a href="#/ston-tokens" class="sidebar-link" data-route="ston-tokens">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
@@ -855,6 +931,10 @@
     <a href="#/trading" class="bottom-nav-link" data-route="trading">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
       <span>Трейдинг</span>
+    </a>
+    <a href="#/archive" class="bottom-nav-link" data-route="archive" style="color: var(--neon-red);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+      <span>Архив</span>
     </a>
     <a href="#/ston-tokens" class="bottom-nav-link" data-route="ston-tokens">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
@@ -961,12 +1041,6 @@
       <button type="submit" class="submit-btn">Сохранить операцию</button>
     </form>
   </dialog>
-
-  <!-- Firebase SDK (ДОБАВЛЕНО) -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-client.js"></script>
 
   <script src="js/db.js"></script>
   <script src="js/router.js"></script>
