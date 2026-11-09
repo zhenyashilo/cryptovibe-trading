@@ -1,5 +1,5 @@
 // Модуль управления токенами STON.fi
-// Синхронизация через Firebase
+// Синхронизация через Firebase с обработкой ошибок миграции
 
 const TokensRegistry = {
   
@@ -15,10 +15,15 @@ const TokensRegistry = {
 
   async getAll() {
     if (await this._isAuthenticated()) {
-      const snapshot = await firebase.firestore().collection('ston_tokens')
-        .where('userId', '==', FirebaseClient.currentUser.uid)
-        .get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      try {
+        const snapshot = await firebase.firestore().collection('ston_tokens')
+          .where('userId', '==', FirebaseClient.currentUser.uid)
+          .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (err) {
+        console.error('TokensRegistry.getAll error:', err);
+        return [];
+      }
     } else {
       const data = localStorage.getItem('ston_tokens');
       return data ? JSON.parse(data) : [];
@@ -48,11 +53,27 @@ const TokensRegistry = {
 
   async update(token) {
     if (await this._isAuthenticated()) {
-      await firebase.firestore().collection('ston_tokens').doc(token.id).update({
-        ...token,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      return token;
+      try {
+        // Используем set() вместо update() — создаст документ если его нет
+        await firebase.firestore().collection('ston_tokens').doc(token.id).set({
+          ...token,
+          userId: FirebaseClient.currentUser.uid,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        return token;
+      } catch (err) {
+        console.error('TokensRegistry.update error:', err);
+        // Если ошибка — значит документа нет, создаём его
+        if (err.code === 'not-found' || err.message.includes('No document')) {
+          const docRef = await firebase.firestore().collection('ston_tokens').add({
+            ...token,
+            userId: FirebaseClient.currentUser.uid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          return { id: docRef.id, ...token };
+        }
+        throw err;
+      }
     } else {
       const tokens = await this.getAll();
       const idx = tokens.findIndex(t => t.id === token.id);
@@ -66,7 +87,15 @@ const TokensRegistry = {
 
   async delete(id) {
     if (await this._isAuthenticated()) {
-      await firebase.firestore().collection('ston_tokens').doc(id).delete();
+      try {
+        await firebase.firestore().collection('ston_tokens').doc(id).delete();
+      } catch (err) {
+        console.error('TokensRegistry.delete error:', err);
+        // Если документа нет — просто игнорируем ошибку
+        if (err.code !== 'not-found' && !err.message.includes('No document')) {
+          throw err;
+        }
+      }
     } else {
       const tokens = await this.getAll();
       const filtered = tokens.filter(t => t.id !== id);
