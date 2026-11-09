@@ -46,7 +46,7 @@ const StonPage = {
             1. Откройте <a href="https://ston.fi/tokens" target="_blank" style="color: var(--neon-cyan);">ston.fi/tokens</a><br>
             2. Найдите нужный токен<br>
             3. Скопируйте адрес контракта (начинается с EQ... или UQ...)<br>
-            4. Вставьте в форму добавления
+            4. Вставьте в форму добавления — название подтянется автоматически
           </p>
         </div>
       </section>
@@ -58,7 +58,7 @@ const StonPage = {
     const activeRules = alert?.rules?.filter(r => r.enabled).length || 0;
     
     return `
-      <div class="token-item" data-id="${token.id}" style="cursor: default;">
+      <div class="token-item" data-address="${token.address}" style="cursor: default;">
         <div class="token-info">
           <div class="token-icon">${token.name.substring(0, 2).toUpperCase()}</div>
           <div style="flex: 1;">
@@ -68,19 +68,19 @@ const StonPage = {
             </div>
             <div style="margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.2rem;">
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span class="token-quantity" id="price-${token.id}" style="font-weight: 600;">Загрузка...</span>
-                <span id="price-source-${token.id}" style="font-size: 0.7rem; color: var(--text-secondary);"></span>
+                <span class="token-quantity" id="price-${token.address}" style="font-weight: 600;">Загрузка...</span>
+                <span id="price-source-${token.address}" style="font-size: 0.7rem; color: var(--text-secondary);"></span>
               </div>
-              <div id="price-status-${token.id}" style="font-size: 0.75rem; color: var(--text-secondary); min-height: 1rem;"></div>
+              <div id="price-status-${token.address}" style="font-size: 0.75rem; color: var(--text-secondary); min-height: 1rem;"></div>
             </div>
             ${activeRules > 0 ? `<div style="margin-top: 0.25rem;"><span class="token-quantity" style="background: rgba(255, 230, 0, 0.15); color: var(--neon-yellow); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px;">🔔 ${activeRules} алерт(ов)</span></div>` : ''}
           </div>
         </div>
         <div class="tx-actions" style="gap: 0.5rem;">
-          <button class="tx-action-btn" data-action="alerts" data-id="${token.id}" title="Алерты">🔔</button>
-          <button class="tx-action-btn" data-action="refresh" data-id="${token.id}" title="Обновить курс">🔄</button>
-          <button class="tx-action-btn" data-action="edit" data-id="${token.id}" title="Редактировать">✏️</button>
-          <button class="tx-action-btn delete" data-action="delete" data-id="${token.id}" title="Удалить">🗑️</button>
+          <button class="tx-action-btn" data-action="alerts" data-address="${token.address}" title="Алерты">🔔</button>
+          <button class="tx-action-btn" data-action="refresh" data-address="${token.address}" title="Обновить курс">🔄</button>
+          <button class="tx-action-btn" data-action="edit" data-address="${token.address}" title="Редактировать">✏️</button>
+          <button class="tx-action-btn delete" data-action="delete" data-address="${token.address}" title="Удалить">🗑️</button>
         </div>
       </div>
     `;
@@ -94,21 +94,16 @@ const StonPage = {
     document.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const action = btn.dataset.action;
-        const tokenId = btn.dataset.id;
+        const address = btn.dataset.address;
         const tokens = await TokensRegistry.getAll();
-        const token = tokens.find(t => t.id === tokenId);
-        
-        if (!token) {
-          console.error('Токен не найден по ID:', tokenId);
-          return;
-        }
-        
+        const token = tokens.find(t => t.address === address);
+        if (!token) return;
         switch (action) {
           case 'alerts':
             AlertsUI.openAlertsModal(token);
             break;
           case 'refresh':
-            await this.refreshTokenPrice(token);
+            await this.refreshTokenPrice(address);
             break;
           case 'edit':
             this.openEditModal(token);
@@ -116,7 +111,7 @@ const StonPage = {
           case 'delete':
             if (confirm(`Удалить токен ${token.name}?`)) {
               await TokensRegistry.delete(token.id);
-              await Notifications.deleteAlert(token.address);
+              await Notifications.deleteAlert(address);
               document.getElementById('main-content').innerHTML = await this.render();
               this.bindEvents();
               this.loadPrices();
@@ -138,9 +133,9 @@ const StonPage = {
     
     tokens.forEach(token => {
       const priceData = prices[token.address];
-      const priceEl = document.getElementById(`price-${token.id}`);
-      const statusEl = document.getElementById(`price-status-${token.id}`);
-      const sourceEl = document.getElementById(`price-source-${token.id}`);
+      const priceEl = document.getElementById(`price-${token.address}`);
+      const statusEl = document.getElementById(`price-status-${token.address}`);
+      const sourceEl = document.getElementById(`price-source-${token.address}`);
       
       if (priceEl) {
         if (priceData && priceData.available && priceData.price > 0) {
@@ -207,12 +202,12 @@ const StonPage = {
     }
   },
 
-  async refreshTokenPrice(token) {
-    StonAPI._cache.delete(token.address + ':USD');
+  async refreshTokenPrice(address) {
+    StonAPI._cache.delete(address + ':USD');
     
-    const priceEl = document.getElementById(`price-${token.id}`);
-    const statusEl = document.getElementById(`price-status-${token.id}`);
-    const sourceEl = document.getElementById(`price-source-${token.id}`);
+    const priceEl = document.getElementById(`price-${address}`);
+    const statusEl = document.getElementById(`price-status-${address}`);
+    const sourceEl = document.getElementById(`price-source-${address}`);
     
     if (priceEl) {
       priceEl.textContent = 'Обновление...';
@@ -232,121 +227,153 @@ const StonPage = {
     const modal = document.createElement('dialog');
     modal.id = 'add-token-modal';
     modal.innerHTML = `
-      <div class="modal-header">
-        <h2>Добавить токен</h2>
-        <button class="close-btn" id="close-add-modal">&times;</button>
+      <div class="modal-header" style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-size: 1.25rem;">Добавить токен</h2>
+        <button class="close-btn" id="close-add-modal" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer;">&times;</button>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Название токена</label>
-          <input type="text" id="new-token-name" class="form-input" placeholder="Напр: VOLT">
+      <div class="modal-body" style="padding: 1.25rem; display: grid; gap: 1rem;">
+        <div class="form-group" style="display: grid; gap: 0.4rem;">
+          <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Адрес контракта</label>
+          <input type="text" id="new-token-address" class="form-input" placeholder="EQ... или UQ... (48 символов)" autocomplete="off">
+          <span class="form-hint" style="font-size: 0.75rem; color: var(--text-secondary);">Вставьте адрес — название и цена подтянутся автоматически</span>
         </div>
-        <div class="form-group">
-          <label>Адрес контракта</label>
-          <input type="text" id="new-token-address" class="form-input" placeholder="EQ... или UQ...">
-          <span class="form-hint">Формат: EQ или UQ + 46 символов</span>
+        
+        <div id="token-preview" style="display: none; background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 8px; padding: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+            <div id="preview-icon" style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple)); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #fff;"></div>
+            <div style="flex: 1;">
+              <div id="preview-name" style="font-weight: 600; font-size: 1.1rem;"></div>
+              <div id="preview-symbol" style="font-size: 0.8rem; color: var(--text-secondary);"></div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
+            <div><span style="color: var(--text-secondary);">Цена:</span> <span id="preview-price" style="color: var(--neon-green); font-weight: 600;"></span></div>
+            <div><span style="color: var(--text-secondary);">24ч:</span> <span id="preview-change"></span></div>
+            <div><span style="color: var(--text-secondary);">DEX:</span> <span id="preview-dex"></span></div>
+            <div><span style="color: var(--text-secondary);">Пул:</span> <span id="preview-pool"></span></div>
+          </div>
         </div>
-        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
-          <button class="submit-btn" id="verify-token-btn" style="flex: 1; background: var(--neon-purple);">Проверить</button>
-          <button class="submit-btn" id="save-token-btn" style="flex: 1;" disabled>Добавить</button>
+        
+        <div id="loading-state" style="display: none; text-align: center; padding: 1rem;">
+          <div style="font-size: 1.5rem; animation: pulse 1s infinite;">⏳</div>
+          <div style="color: var(--text-secondary); margin-top: 0.5rem;">Ищем токен...</div>
         </div>
-        <div id="verify-result" style="margin-top: 1rem; padding: 0.75rem; border-radius: 8px; display: none;"></div>
+        
+        <div id="error-state" style="display: none; background: rgba(255, 0, 85, 0.1); border: 1px solid rgba(255, 0, 85, 0.3); border-radius: 8px; padding: 0.75rem; color: var(--neon-red); font-size: 0.9rem;"></div>
+        
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+          <button class="submit-btn" id="save-token-btn" style="flex: 1;" disabled>Добавить токен</button>
+          <button class="submit-btn secondary" id="cancel-add-btn" style="flex: 1; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--glass-border);">Отмена</button>
+        </div>
       </div>
+      <style>@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }</style>
     `;
 
     document.body.appendChild(modal);
     modal.showModal();
 
-    let verifiedAddress = null;
+    let tokenInfo = null;
+    let debounceTimer = null;
 
     document.getElementById('close-add-modal').onclick = () => modal.close();
+    document.getElementById('cancel-add-btn').onclick = () => modal.close();
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
 
-    document.getElementById('verify-token-btn').onclick = async () => {
-      const address = document.getElementById('new-token-address').value.trim();
-      const resultEl = document.getElementById('verify-result');
+    const addressInput = document.getElementById('new-token-address');
+    const previewEl = document.getElementById('token-preview');
+    const loadingEl = document.getElementById('loading-state');
+    const errorEl = document.getElementById('error-state');
+    const saveBtn = document.getElementById('save-token-btn');
+
+    addressInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      const address = addressInput.value.trim();
       
+      // Сбрасываем состояние
+      previewEl.style.display = 'none';
+      loadingEl.style.display = 'none';
+      errorEl.style.display = 'none';
+      saveBtn.disabled = true;
+      tokenInfo = null;
+
+      // Валидация формата
       if (!TokensRegistry.isValidAddress(address)) {
-        resultEl.style.display = 'block';
-        resultEl.style.background = 'rgba(255, 0, 85, 0.1)';
-        resultEl.style.color = 'var(--neon-red)';
-        resultEl.textContent = '❌ Неверный формат адреса';
-        return;
-      }
-
-      resultEl.style.display = 'block';
-      resultEl.style.background = 'rgba(0, 243, 255, 0.1)';
-      resultEl.style.color = 'var(--neon-cyan)';
-      resultEl.textContent = '⏳ Проверяем по всем источникам...';
-
-      try {
-        const allPools = await StonAPI.getAvailablePools(address);
-        console.log('Доступные пулы:', allPools);
-        
-        const priceData = await StonAPI.getCurrentPrice(address, 'USDT');
-        console.log('Результат getCurrentPrice:', priceData);
-        
-        if (priceData.available && priceData.price > 0) {
-          verifiedAddress = address;
-          resultEl.style.background = 'rgba(0, 255, 157, 0.1)';
-          resultEl.style.color = 'var(--neon-green)';
-          let msg = `✅ Цена: $${priceData.price.toFixed(8)}`;
-          msg += ` | Источник: ${priceData.source}`;
-          if (priceData.poolName) msg += ` | Пул: ${priceData.poolName}`;
-          if (priceData.priceChange24h !== 0) {
-            const sign = priceData.priceChange24h > 0 ? '+' : '';
-            msg += ` | 24ч: ${sign}${priceData.priceChange24h.toFixed(2)}%`;
-          }
-          resultEl.textContent = msg;
-          document.getElementById('save-token-btn').disabled = false;
-        } else {
-          resultEl.style.background = 'rgba(255, 0, 85, 0.1)';
-          resultEl.style.color = 'var(--neon-red)';
-          if (allPools.length > 0) {
-            resultEl.textContent = `⚠️ Пулы найдены (${allPools.length}), но цена = 0.`;
-          } else {
-            resultEl.textContent = '❌ Токен не найден ни в одном источнике. Проверь адрес.';
-          }
+        if (address.length > 5) {
+          errorEl.style.display = 'block';
+          errorEl.textContent = '❌ Неверный формат адреса (должен начинаться с EQ или UQ и содержать 48 символов)';
         }
-      } catch (err) {
-        console.error('Verify error:', err);
-        resultEl.style.background = 'rgba(255, 0, 85, 0.1)';
-        resultEl.style.color = 'var(--neon-red)';
-        resultEl.textContent = '❌ Ошибка: ' + err.message;
-      }
-    };
-
-    document.getElementById('save-token-btn').onclick = async () => {
-      const name = document.getElementById('new-token-name').value.trim().toUpperCase();
-      
-      if (!name) {
-        Notifications.showToast('Введите название', 'error');
         return;
       }
 
-      if (!verifiedAddress) {
-        Notifications.showToast('Сначала проверьте адрес', 'error');
+      // Показываем загрузку
+      loadingEl.style.display = 'block';
+
+      // Дебаунс запроса
+      debounceTimer = setTimeout(async () => {
+        try {
+          const info = await StonAPI.getTokenInfo(address);
+          loadingEl.style.display = 'none';
+
+          if (!info) {
+            errorEl.style.display = 'block';
+            errorEl.textContent = '❌ Токен не найден. Проверь адрес или попробуй позже.';
+            return;
+          }
+
+          tokenInfo = info;
+
+          // Заполняем превью
+          document.getElementById('preview-icon').textContent = info.symbol.substring(0, 2).toUpperCase();
+          document.getElementById('preview-name').textContent = info.name;
+          document.getElementById('preview-symbol').textContent = `${info.symbol} • ${info.chainId.toUpperCase()}`;
+          document.getElementById('preview-price').textContent = '$' + info.priceUsd.toFixed(8);
+          
+          const changeEl = document.getElementById('preview-change');
+          const changeSign = info.priceChange24h >= 0 ? '+' : '';
+          changeEl.textContent = `${changeSign}${info.priceChange24h.toFixed(2)}%`;
+          changeEl.style.color = info.priceChange24h >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+          
+          document.getElementById('preview-dex').textContent = info.dex;
+          document.getElementById('preview-pool').textContent = info.poolName;
+
+          previewEl.style.display = 'block';
+          saveBtn.disabled = false;
+        } catch (err) {
+          loadingEl.style.display = 'none';
+          errorEl.style.display = 'block';
+          errorEl.textContent = '❌ Ошибка: ' + err.message;
+        }
+      }, 500);
+    });
+
+    saveBtn.onclick = async () => {
+      if (!tokenInfo) {
+        Notifications.showToast('Сначала дождитесь загрузки данных', 'error');
         return;
       }
 
-      const existing = await TokensRegistry.getByAddress(verifiedAddress);
+      // Проверяем не добавлен ли уже
+      const existing = await TokensRegistry.getByAddress(tokenInfo.address);
       if (existing) {
-        Notifications.showToast('Такой токен уже добавлен', 'error');
+        Notifications.showToast('Этот токен уже добавлен', 'error');
         return;
       }
 
       try {
         await TokensRegistry.add({
-          name,
-          address: verifiedAddress,
-          dex: 'multi-source'
+          name: tokenInfo.name.toUpperCase(),
+          symbol: tokenInfo.symbol,
+          address: tokenInfo.address,
+          dex: tokenInfo.dex,
+          chainId: tokenInfo.chainId
         });
         
-        Notifications.showToast(`Токен ${name} добавлен`, 'success');
+        Notifications.showToast(`Токен ${tokenInfo.name} добавлен`, 'success');
         modal.close();
         
         document.getElementById('main-content').innerHTML = await this.render();
         this.bindEvents();
+        this.loadPrices();
       } catch (err) {
         Notifications.showToast('Ошибка: ' + err.message, 'error');
       }
@@ -357,23 +384,23 @@ const StonPage = {
     const modal = document.createElement('dialog');
     modal.id = 'edit-token-modal';
     modal.innerHTML = `
-      <div class="modal-header">
-        <h2>Редактировать токен</h2>
-        <button class="close-btn" id="close-edit-modal">&times;</button>
+      <div class="modal-header" style="padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-size: 1.25rem;">Редактировать токен</h2>
+        <button class="close-btn" id="close-edit-modal" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer;">&times;</button>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Название токена</label>
+      <div class="modal-body" style="padding: 1.25rem; display: grid; gap: 1rem;">
+        <div class="form-group" style="display: grid; gap: 0.4rem;">
+          <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Название токена</label>
           <input type="text" id="edit-token-name" class="form-input" value="${token.name}">
         </div>
-        <div class="form-group">
-          <label>Адрес контракта</label>
+        <div class="form-group" style="display: grid; gap: 0.4rem;">
+          <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Адрес контракта</label>
           <input type="text" class="form-input" value="${token.address}" readonly style="opacity: 0.6;">
-          <span class="form-hint">Адрес нельзя изменить</span>
+          <span class="form-hint" style="font-size: 0.75rem; color: var(--text-secondary);">Адрес нельзя изменить</span>
         </div>
-        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
           <button class="submit-btn" id="save-edit-btn" style="flex: 1;">Сохранить</button>
-          <button class="submit-btn secondary" id="cancel-edit-btn" style="flex: 1;">Отмена</button>
+          <button class="submit-btn secondary" id="cancel-edit-btn" style="flex: 1; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--glass-border);">Отмена</button>
         </div>
       </div>
     `;
@@ -387,17 +414,14 @@ const StonPage = {
 
     document.getElementById('save-edit-btn').onclick = async () => {
       const newName = document.getElementById('edit-token-name').value.trim().toUpperCase();
-      
       if (!newName) {
         Notifications.showToast('Введите название', 'error');
         return;
       }
-
       try {
         await TokensRegistry.update({ ...token, name: newName });
         Notifications.showToast('Токен обновлён', 'success');
         modal.close();
-        
         document.getElementById('main-content').innerHTML = await this.render();
         this.bindEvents();
         this.loadPrices();
