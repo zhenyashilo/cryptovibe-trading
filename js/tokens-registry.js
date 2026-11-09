@@ -1,5 +1,5 @@
 // Модуль управления токенами STON.fi
-// Синхронизация через Firebase с обработкой ошибок миграции
+// Синхронизация через Firebase
 
 const TokensRegistry = {
   
@@ -54,7 +54,6 @@ const TokensRegistry = {
   async update(token) {
     if (await this._isAuthenticated()) {
       try {
-        // Используем set() вместо update() — создаст документ если его нет
         await firebase.firestore().collection('ston_tokens').doc(token.id).set({
           ...token,
           userId: FirebaseClient.currentUser.uid,
@@ -63,7 +62,6 @@ const TokensRegistry = {
         return token;
       } catch (err) {
         console.error('TokensRegistry.update error:', err);
-        // Если ошибка — значит документа нет, создаём его
         if (err.code === 'not-found' || err.message.includes('No document')) {
           const docRef = await firebase.firestore().collection('ston_tokens').add({
             ...token,
@@ -91,7 +89,6 @@ const TokensRegistry = {
         await firebase.firestore().collection('ston_tokens').doc(id).delete();
       } catch (err) {
         console.error('TokensRegistry.delete error:', err);
-        // Если документа нет — просто игнорируем ошибку
         if (err.code !== 'not-found' && !err.message.includes('No document')) {
           throw err;
         }
