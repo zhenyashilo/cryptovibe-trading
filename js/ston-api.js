@@ -1,11 +1,8 @@
 // API цен через DexScreener (без CORS проблем)
-
 const StonAPI = {
   _cache: new Map(),
   CACHE_TTL: 15 * 60 * 1000,
-  
   USDT_ADDRESS: 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA',
-  
   STORAGE_KEY: 'stonapi_last_prices',
   STORAGE_TTL_KEY: 'stonapi_last_prices_time',
   STORAGE_TTL: 60 * 60 * 1000,
@@ -31,10 +28,59 @@ const StonAPI = {
   getLastKnownPrice(tokenAddress) {
     const memCache = this._cache.get(tokenAddress);
     if (memCache && memCache.price > 0) return memCache;
-    
     const storage = this._loadFromStorage();
     if (storage[tokenAddress] && storage[tokenAddress].price > 0) {
       return { ...storage[tokenAddress], fromStorage: true, timestamp: storage[tokenAddress].timestamp || 0 };
+    }
+    return null;
+  },
+
+  // НОВЫЙ МЕТОД: получить информацию о токене (название, символ, цена)
+  async getTokenInfo(tokenAddress) {
+    try {
+      const url = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`;
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const pairs = data.pairs || [];
+      if (pairs.length === 0) return null;
+      
+      // Ищем лучшую пару (USDT или TON)
+      let bestPair = null;
+      for (const pair of pairs) {
+        if (pair.chainId === 'ton') {
+          const quoteSymbol = (pair.quoteToken?.symbol || '').toUpperCase();
+          if (quoteSymbol === 'USDT' || quoteSymbol === 'TON') {
+            bestPair = pair;
+            break;
+          }
+        }
+      }
+      if (!bestPair && pairs.length > 0) {
+        bestPair = pairs[0];
+      }
+      
+      if (bestPair) {
+        const baseToken = bestPair.baseToken || {};
+        const quoteToken = bestPair.quoteToken || {};
+        return {
+          address: tokenAddress,
+          name: baseToken.name || baseToken.symbol || 'Unknown',
+          symbol: baseToken.symbol || '???',
+          chainId: bestPair.chainId || 'unknown',
+          dex: bestPair.dexId || 'unknown',
+          pairAddress: bestPair.pairAddress || '',
+          priceUsd: parseFloat(bestPair.priceUsd || '0'),
+          priceChange24h: parseFloat(bestPair.priceChange?.h24 || '0'),
+          liquidity: parseFloat(bestPair.liquidity?.usd || '0'),
+          volume24h: parseFloat(bestPair.volume?.h24 || '0'),
+          poolName: `${baseToken.symbol || '?'}/${quoteToken.symbol || '?'}`,
+          source: 'DexScreener'
+        };
+      }
+    } catch (e) {
+      console.log('getTokenInfo error:', e.message);
     }
     return null;
   },
@@ -59,7 +105,6 @@ const StonAPI = {
           }
         }
       }
-      
       if (!bestPair && pairs.length > 0) {
         bestPair = pairs[0];
       }
