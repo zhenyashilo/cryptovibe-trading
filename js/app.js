@@ -370,7 +370,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeSelect) {
     typeSelect.addEventListener('selectchange', (e) => updateFormUI(e.detail.value));
   }
-  // FIFO с сортировкой по дате + времени + поддержка write_off
   const calculateOpenPositions = (txs) => {
     const openBuys = [];
     let totalOpenQty = 0;
@@ -1596,6 +1595,26 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const init = async () => {
     try {
+      // ПРОВЕРКА АВТОРИЗАЦИИ FIREBASE
+      if (typeof FirebaseClient !== 'undefined') {
+        await FirebaseClient.init();
+        await new Promise(resolve => FirebaseClient.onAuthReady(() => resolve()));
+        
+        if (!FirebaseClient.isAuthenticated()) {
+          const isGuest = localStorage.getItem('guest_mode') === 'true';
+          if (!isGuest) {
+            window.location.href = 'auth.html';
+            return;
+          }
+        }
+        
+        // МИГРАЦИЯ ТОКЕНОВ
+        if (FirebaseClient.isAuthenticated()) {
+          console.log('🔄 Миграция токенов...');
+          await FirebaseClient.migrateTokensFromLocalStorage();
+        }
+      }
+
       let storedTypes = await DB.getTypes();
       if (storedTypes.length === 0) {
         for (const t of defaultTypes) await DB.addType(t);
