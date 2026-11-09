@@ -1,5 +1,5 @@
 const DB_NAME = 'CryptoVibeDB';
-const DB_VERSION = 4;  // Увеличили с 3 до 4
+const DB_VERSION = 4;
 const STORE_TX = 'transactions';
 const STORE_TYPES = 'operationTypes';
 
@@ -29,7 +29,6 @@ const dbPromise = new Promise((resolve, reject) => {
         db.createObjectStore(STORE_TYPES, { keyPath: 'key' });
       }
       
-      // НОВЫЕ store для STON.fi
       if (!db.objectStoreNames.contains('stonTokens')) {
         const store = db.createObjectStore('stonTokens', { keyPath: 'id' });
         store.createIndex('address', 'address', { unique: true });
@@ -47,7 +46,15 @@ const dbPromise = new Promise((resolve, reject) => {
 });
 
 const DB = {
+  // Вспомогательный метод: проверяем, можно ли использовать облако
+  async _useFirebase() {
+    return typeof FirebaseClient !== 'undefined' && FirebaseClient.isAuthenticated();
+  },
+
   async add(tx) {
+    if (await this._useFirebase()) {
+      return await FirebaseClient.addTrade(tx); // === СОХРАНЯЕМ В ОБЛАКО ===
+    }
     const db = await dbPromise;
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_TX, 'readwrite');
@@ -59,6 +66,9 @@ const DB = {
   },
   
   async update(tx) {
+    if (await this._useFirebase()) {
+      return await FirebaseClient.updateTrade(tx.id, tx); // === ОБНОВЛЯЕМ В ОБЛАКЕ ===
+    }
     const db = await dbPromise;
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_TX, 'readwrite');
@@ -70,6 +80,9 @@ const DB = {
   },
   
   async delete(id) {
+    if (await this._useFirebase()) {
+      return await FirebaseClient.deleteTrade(id); // === УДАЛЯЕМ ИЗ ОБЛАКА ===
+    }
     const db = await dbPromise;
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_TX, 'readwrite');
@@ -81,6 +94,9 @@ const DB = {
   },
   
   async getAll() {
+    if (await this._useFirebase()) {
+      return await FirebaseClient.getTrades(); // === ЧИТАЕМ ИЗ ОБЛАКА ===
+    }
     const db = await dbPromise;
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_TX, 'readonly');
