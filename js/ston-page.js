@@ -1,5 +1,4 @@
 // Страница управления токенами STON.fi
-
 const StonPage = {
   async render() {
     const tokens = await TokensRegistry.getAll();
@@ -59,7 +58,7 @@ const StonPage = {
     const activeRules = alert?.rules?.filter(r => r.enabled).length || 0;
     
     return `
-      <div class="token-item" data-address="${token.address}" style="cursor: default;">
+      <div class="token-item" data-id="${token.id}" style="cursor: default;">
         <div class="token-info">
           <div class="token-icon">${token.name.substring(0, 2).toUpperCase()}</div>
           <div style="flex: 1;">
@@ -69,19 +68,19 @@ const StonPage = {
             </div>
             <div style="margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.2rem;">
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span class="token-quantity" id="price-${token.address}" style="font-weight: 600;">Загрузка...</span>
-                <span id="price-source-${token.address}" style="font-size: 0.7rem; color: var(--text-secondary);"></span>
+                <span class="token-quantity" id="price-${token.id}" style="font-weight: 600;">Загрузка...</span>
+                <span id="price-source-${token.id}" style="font-size: 0.7rem; color: var(--text-secondary);"></span>
               </div>
-              <div id="price-status-${token.address}" style="font-size: 0.75rem; color: var(--text-secondary); min-height: 1rem;"></div>
+              <div id="price-status-${token.id}" style="font-size: 0.75rem; color: var(--text-secondary); min-height: 1rem;"></div>
             </div>
             ${activeRules > 0 ? `<div style="margin-top: 0.25rem;"><span class="token-quantity" style="background: rgba(255, 230, 0, 0.15); color: var(--neon-yellow); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px;">🔔 ${activeRules} алерт(ов)</span></div>` : ''}
           </div>
         </div>
         <div class="tx-actions" style="gap: 0.5rem;">
-          <button class="tx-action-btn" data-action="alerts" data-address="${token.address}" title="Алерты">🔔</button>
-          <button class="tx-action-btn" data-action="refresh" data-address="${token.address}" title="Обновить курс">🔄</button>
-          <button class="tx-action-btn" data-action="edit" data-address="${token.address}" title="Редактировать">✏️</button>
-          <button class="tx-action-btn delete" data-action="delete" data-address="${token.address}" title="Удалить">🗑️</button>
+          <button class="tx-action-btn" data-action="alerts" data-id="${token.id}" title="Алерты">🔔</button>
+          <button class="tx-action-btn" data-action="refresh" data-id="${token.id}" title="Обновить курс">🔄</button>
+          <button class="tx-action-btn" data-action="edit" data-id="${token.id}" title="Редактировать">✏️</button>
+          <button class="tx-action-btn delete" data-action="delete" data-id="${token.id}" title="Удалить">🗑️</button>
         </div>
       </div>
     `;
@@ -95,18 +94,21 @@ const StonPage = {
     document.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const action = btn.dataset.action;
-        const address = btn.dataset.address;
+        const tokenId = btn.dataset.id;
         const tokens = await TokensRegistry.getAll();
-        const token = tokens.find(t => t.address === address);
+        const token = tokens.find(t => t.id === tokenId);
         
-        if (!token) return;
+        if (!token) {
+          console.error('Токен не найден по ID:', tokenId);
+          return;
+        }
         
         switch (action) {
           case 'alerts':
             AlertsUI.openAlertsModal(token);
             break;
           case 'refresh':
-            await this.refreshTokenPrice(address);
+            await this.refreshTokenPrice(token);
             break;
           case 'edit':
             this.openEditModal(token);
@@ -114,7 +116,7 @@ const StonPage = {
           case 'delete':
             if (confirm(`Удалить токен ${token.name}?`)) {
               await TokensRegistry.delete(token.id);
-              await Notifications.deleteAlert(address);
+              await Notifications.deleteAlert(token.address);
               document.getElementById('main-content').innerHTML = await this.render();
               this.bindEvents();
               this.loadPrices();
@@ -136,9 +138,9 @@ const StonPage = {
     
     tokens.forEach(token => {
       const priceData = prices[token.address];
-      const priceEl = document.getElementById(`price-${token.address}`);
-      const statusEl = document.getElementById(`price-status-${token.address}`);
-      const sourceEl = document.getElementById(`price-source-${token.address}`);
+      const priceEl = document.getElementById(`price-${token.id}`);
+      const statusEl = document.getElementById(`price-status-${token.id}`);
+      const sourceEl = document.getElementById(`price-source-${token.id}`);
       
       if (priceEl) {
         if (priceData && priceData.available && priceData.price > 0) {
@@ -205,12 +207,12 @@ const StonPage = {
     }
   },
 
-  async refreshTokenPrice(address) {
-    StonAPI._cache.delete(address + ':USD');
+  async refreshTokenPrice(token) {
+    StonAPI._cache.delete(token.address + ':USD');
     
-    const priceEl = document.getElementById(`price-${address}`);
-    const statusEl = document.getElementById(`price-status-${address}`);
-    const sourceEl = document.getElementById(`price-source-${address}`);
+    const priceEl = document.getElementById(`price-${token.id}`);
+    const statusEl = document.getElementById(`price-status-${token.id}`);
+    const sourceEl = document.getElementById(`price-source-${token.id}`);
     
     if (priceEl) {
       priceEl.textContent = 'Обновление...';
