@@ -1397,8 +1397,9 @@ document.addEventListener('DOMContentLoaded', () => {
         archivePrice: value,
         createdAt: Date.now()
       };
-      await DB.add(txData);
-      transactions.push(txData);
+      // === ИСПРАВЛЕНО: используем результат от DB.add() ===
+      const result = await DB.add(txData);
+      transactions.push(result || txData);
       modal.close();
       modal.remove();
       Router.resolve();
@@ -1511,6 +1512,8 @@ document.addEventListener('DOMContentLoaded', () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // === ИСПРАВЛЕНО: используем результат от DB.add() и DB.update() ===
   els.form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -1561,12 +1564,12 @@ document.addEventListener('DOMContentLoaded', () => {
       createdAt: Date.now()
     };
     if (editingTxId) {
-      await DB.update(txData);
+      const result = await DB.update(txData);
       const idx = transactions.findIndex(t => t.id === editingTxId);
-      if (idx !== -1) transactions[idx] = txData;
+      if (idx !== -1) transactions[idx] = result || txData;
     } else {
-      await DB.add(txData);
-      transactions.push(txData);
+      const result = await DB.add(txData);
+      transactions.push(result || txData);
     }
     els.modal.close();
     Router.resolve();
@@ -1595,7 +1598,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const init = async () => {
     try {
-      // ПРОВЕРКА АВТОРИЗАЦИИ FIREBASE
       if (typeof FirebaseClient !== 'undefined') {
         await FirebaseClient.init();
         await new Promise(resolve => FirebaseClient.onAuthReady(() => resolve()));
@@ -1608,7 +1610,6 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
         
-        // МИГРАЦИЯ ТОКЕНОВ
         if (FirebaseClient.isAuthenticated()) {
           console.log('🔄 Миграция токенов...');
           await FirebaseClient.migrateTokensFromLocalStorage();
@@ -1635,7 +1636,9 @@ document.addEventListener('DOMContentLoaded', () => {
       renderTypeOptions();
       initNameAutocomplete();
       updateFormUI('buy');
+      
       transactions = await DB.getAll();
+      
       let migrationNeeded = false;
       for (const tx of transactions) {
         let updated = false;
@@ -1655,6 +1658,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (migrationNeeded) {
         console.log('Миграция: добавлены time и createdAt для старых транзакций');
       }
+      
       Router.init();
       if (typeof Notifications !== 'undefined') {
         await Notifications.loadAlerts();
