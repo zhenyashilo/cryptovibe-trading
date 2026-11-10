@@ -23,7 +23,7 @@ const FirebaseClient = {
     return new Promise((resolve) => {
       auth.onAuthStateChanged((user) => {
         this.currentUser = user;
-        console.log('Auth state changed:', user ? user.email : 'No user');
+        console.log('🔐 Auth state changed:', user ? user.email : 'No user');
         if (!this.authReady) {
           this.authReady = true;
           this.authReadyCallbacks.forEach(cb => cb(user));
@@ -66,51 +66,106 @@ const FirebaseClient = {
       console.log('✅ Миграция завершена');
       localStorage.removeItem('ston_tokens');
     } catch (err) {
-      console.error('Ошибка миграции:', err);
+      console.error(' Ошибка миграции:', err);
     }
   },
 
   async getTrades() {
-    if (!this.currentUser) return [];
-    const snapshot = await db.collection('trades').where('userId', '==', this.currentUser.uid).orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    if (!this.currentUser) {
+      console.warn('⚠️ getTrades: нет авторизации');
+      return [];
+    }
+    try {
+      console.log(' Загрузка транзакций из Firebase...');
+      const snapshot = await db.collection('trades')
+        .where('userId', '==', this.currentUser.uid)
+        .orderBy('createdAt', 'desc')
+        .get();
+      console.log('✅ Загружено', snapshot.docs.length, 'транзакций');
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (err) {
+      console.error('❌ getTrades error:', err);
+      return [];
+    }
   },
 
   async addTrade(trade) {
-    if (!this.currentUser) throw new Error('Not authenticated');
-    const docRef = await db.collection('trades').add({ ...trade, userId: this.currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    return { id: docRef.id, ...trade };
+    if (!this.currentUser) {
+      console.error('❌ addTrade: нет авторизации');
+      throw new Error('Not authenticated');
+    }
+    try {
+      console.log('📤 Добавление транзакции:', trade);
+      const docRef = await db.collection('trades').add({
+        ...trade,
+        userId: this.currentUser.uid,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      console.log('✅ Транзакция добавлена с ID:', docRef.id);
+      return { id: docRef.id, ...trade };
+    } catch (err) {
+      console.error('❌ addTrade error:', err);
+      throw err;
+    }
   },
 
-  // ИСПРАВЛЕНО: используем set() с merge вместо update()
   async updateTrade(id, trade) {
-    if (!this.currentUser) throw new Error('Not authenticated');
-    await db.collection('trades').doc(id).set({
-      ...trade,
-      userId: this.currentUser.uid,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    return { id, ...trade };
+    if (!this.currentUser) {
+      console.error('❌ updateTrade: нет авторизации');
+      throw new Error('Not authenticated');
+    }
+    try {
+      console.log('️ Обновление транзакции', id, ':', trade);
+      await db.collection('trades').doc(id).set({
+        ...trade,
+        userId: this.currentUser.uid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      console.log('✅ Транзакция обновлена');
+      return { id, ...trade };
+    } catch (err) {
+      console.error('❌ updateTrade error:', err);
+      throw err;
+    }
   },
 
   async deleteTrade(id) {
-    if (!this.currentUser) throw new Error('Not authenticated');
-    await db.collection('trades').doc(id).delete();
+    if (!this.currentUser) {
+      console.error('❌ deleteTrade: нет авторизации');
+      throw new Error('Not authenticated');
+    }
+    try {
+      console.log('🗑️ Удаление транзакции с ID:', id);
+      console.log('   Collection: trades, Doc ID:', id);
+      await db.collection('trades').doc(id).delete();
+      console.log('✅ Транзакция удалена');
+    } catch (err) {
+      console.error('❌ deleteTrade error:', err);
+      console.error('   ID:', id);
+      console.error('   User:', this.currentUser.uid);
+      throw err;
+    }
   },
 
   async getPlans() {
     if (!this.currentUser) return [];
-    const snapshot = await db.collection('plans').where('userId', '==', this.currentUser.uid).orderBy('createdAt', 'desc').get();
+    const snapshot = await db.collection('plans')
+      .where('userId', '==', this.currentUser.uid)
+      .orderBy('createdAt', 'desc')
+      .get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
   async addPlan(plan) {
     if (!this.currentUser) throw new Error('Not authenticated');
-    const docRef = await db.collection('plans').add({ ...plan, userId: this.currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    const docRef = await db.collection('plans').add({
+      ...plan,
+      userId: this.currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
     return { id: docRef.id, ...plan };
   },
 
-  // ИСПРАВЛЕНО: используем set() с merge вместо update()
   async updatePlan(id, plan) {
     if (!this.currentUser) throw new Error('Not authenticated');
     await db.collection('plans').doc(id).set({
@@ -128,17 +183,23 @@ const FirebaseClient = {
 
   async getDiary() {
     if (!this.currentUser) return [];
-    const snapshot = await db.collection('diary').where('userId', '==', this.currentUser.uid).orderBy('createdAt', 'desc').get();
+    const snapshot = await db.collection('diary')
+      .where('userId', '==', this.currentUser.uid)
+      .orderBy('createdAt', 'desc')
+      .get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
   async addDiary(entry) {
     if (!this.currentUser) throw new Error('Not authenticated');
-    const docRef = await db.collection('diary').add({ ...entry, userId: this.currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    const docRef = await db.collection('diary').add({
+      ...entry,
+      userId: this.currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
     return { id: docRef.id, ...entry };
   },
 
-  // ИСПРАВЛЕНО: используем set() с merge вместо update()
   async updateDiary(id, entry) {
     if (!this.currentUser) throw new Error('Not authenticated');
     await db.collection('diary').doc(id).set({
