@@ -14,7 +14,6 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Модуль для работы с Firebase
 const FirebaseClient = {
   currentUser: null,
   authReadyCallbacks: [],
@@ -25,13 +24,11 @@ const FirebaseClient = {
       auth.onAuthStateChanged((user) => {
         this.currentUser = user;
         console.log('Auth state changed:', user ? user.email : 'No user');
-        
         if (!this.authReady) {
           this.authReady = true;
           this.authReadyCallbacks.forEach(cb => cb(user));
           this.authReadyCallbacks = [];
         }
-        
         resolve();
       });
     });
@@ -47,26 +44,18 @@ const FirebaseClient = {
 
   async migrateTokensFromLocalStorage() {
     if (!this.currentUser) return;
-    
     const localData = localStorage.getItem('ston_tokens');
     if (!localData) return;
-    
     try {
       const localTokens = JSON.parse(localData);
       if (!Array.isArray(localTokens) || localTokens.length === 0) return;
-      
-      console.log('🔄 Миграция ' + localTokens.length + ' токенов из localStorage в Firebase...');
-      
-      const existingSnapshot = await db.collection('ston_tokens')
-        .where('userId', '==', this.currentUser.uid)
-        .get();
-      
+      console.log('🔄 Миграция ' + localTokens.length + ' токенов в Firebase...');
+      const existingSnapshot = await db.collection('ston_tokens').where('userId', '==', this.currentUser.uid).get();
       if (existingSnapshot.docs.length > 0) {
-        console.log('✅ Токены уже есть в Firebase, пропускаем миграцию');
+        console.log('✅ Токены уже в Firebase');
         localStorage.removeItem('ston_tokens');
         return;
       }
-      
       for (const token of localTokens) {
         await db.collection('ston_tokens').add({
           ...token,
@@ -74,7 +63,6 @@ const FirebaseClient = {
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
-      
       console.log('✅ Миграция завершена');
       localStorage.removeItem('ston_tokens');
     } catch (err) {
@@ -82,45 +70,26 @@ const FirebaseClient = {
     }
   },
 
-  async signUp(email, password) {
-    const { user } = await auth.createUserWithEmailAndPassword(email, password);
-    return user;
-  },
-
-  async signIn(email, password) {
-    const { user } = await auth.signInWithEmailAndPassword(email, password);
-    return user;
-  },
-
-  async signOut() {
-    await auth.signOut();
-  },
-
   async getTrades() {
     if (!this.currentUser) return [];
-    const snapshot = await db.collection('trades')
-      .where('userId', '==', this.currentUser.uid)
-      .orderBy('createdAt', 'desc')
-      .get();
+    const snapshot = await db.collection('trades').where('userId', '==', this.currentUser.uid).orderBy('createdAt', 'desc').get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
   async addTrade(trade) {
     if (!this.currentUser) throw new Error('Not authenticated');
-    const docRef = await db.collection('trades').add({
-      ...trade,
-      userId: this.currentUser.uid,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    const docRef = await db.collection('trades').add({ ...trade, userId: this.currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     return { id: docRef.id, ...trade };
   },
 
+  // ИСПРАВЛЕНО: используем set() с merge вместо update()
   async updateTrade(id, trade) {
     if (!this.currentUser) throw new Error('Not authenticated');
-    await db.collection('trades').doc(id).update({
+    await db.collection('trades').doc(id).set({
       ...trade,
+      userId: this.currentUser.uid,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
     return { id, ...trade };
   },
 
@@ -131,29 +100,24 @@ const FirebaseClient = {
 
   async getPlans() {
     if (!this.currentUser) return [];
-    const snapshot = await db.collection('plans')
-      .where('userId', '==', this.currentUser.uid)
-      .orderBy('createdAt', 'desc')
-      .get();
+    const snapshot = await db.collection('plans').where('userId', '==', this.currentUser.uid).orderBy('createdAt', 'desc').get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
   async addPlan(plan) {
     if (!this.currentUser) throw new Error('Not authenticated');
-    const docRef = await db.collection('plans').add({
-      ...plan,
-      userId: this.currentUser.uid,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    const docRef = await db.collection('plans').add({ ...plan, userId: this.currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     return { id: docRef.id, ...plan };
   },
 
+  // ИСПРАВЛЕНО: используем set() с merge вместо update()
   async updatePlan(id, plan) {
     if (!this.currentUser) throw new Error('Not authenticated');
-    await db.collection('plans').doc(id).update({
+    await db.collection('plans').doc(id).set({
       ...plan,
+      userId: this.currentUser.uid,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
     return { id, ...plan };
   },
 
@@ -164,29 +128,24 @@ const FirebaseClient = {
 
   async getDiary() {
     if (!this.currentUser) return [];
-    const snapshot = await db.collection('diary')
-      .where('userId', '==', this.currentUser.uid)
-      .orderBy('createdAt', 'desc')
-      .get();
+    const snapshot = await db.collection('diary').where('userId', '==', this.currentUser.uid).orderBy('createdAt', 'desc').get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
   async addDiary(entry) {
     if (!this.currentUser) throw new Error('Not authenticated');
-    const docRef = await db.collection('diary').add({
-      ...entry,
-      userId: this.currentUser.uid,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    const docRef = await db.collection('diary').add({ ...entry, userId: this.currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     return { id: docRef.id, ...entry };
   },
 
+  // ИСПРАВЛЕНО: используем set() с merge вместо update()
   async updateDiary(id, entry) {
     if (!this.currentUser) throw new Error('Not authenticated');
-    await db.collection('diary').doc(id).update({
+    await db.collection('diary').doc(id).set({
       ...entry,
+      userId: this.currentUser.uid,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
     return { id, ...entry };
   },
 
@@ -210,11 +169,9 @@ const FirebaseClient = {
     }, { merge: true });
   },
 
-  getCurrentUser() {
-    return this.currentUser;
-  },
-
-  isAuthenticated() {
-    return this.currentUser !== null;
-  }
+  getCurrentUser() { return this.currentUser; },
+  isAuthenticated() { return this.currentUser !== null; },
+  async signUp(email, password) { return (await auth.createUserWithEmailAndPassword(email, password)).user; },
+  async signIn(email, password) { return (await auth.signInWithEmailAndPassword(email, password)).user; },
+  async signOut() { await auth.signOut(); }
 };
