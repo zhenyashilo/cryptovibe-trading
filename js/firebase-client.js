@@ -20,15 +20,26 @@ const FirebaseClient = {
   authReady: false,
 
   async init() {
+    console.log('🔐 FirebaseClient.init() вызван');
+    
     return new Promise((resolve) => {
+      // Если уже авторизован — сразу возвращаем
+      if (this.currentUser && this.authReady) {
+        console.log('✅ Уже авторизован:', this.currentUser.email);
+        resolve();
+        return;
+      }
+
       auth.onAuthStateChanged((user) => {
+        console.log('📡 onAuthStateChanged:', user ? user.email : 'нет пользователя');
         this.currentUser = user;
-        console.log('🔐 Auth state changed:', user ? user.email : 'No user');
+        
         if (!this.authReady) {
           this.authReady = true;
           this.authReadyCallbacks.forEach(cb => cb(user));
           this.authReadyCallbacks = [];
         }
+        
         resolve();
       });
     });
@@ -66,17 +77,17 @@ const FirebaseClient = {
       console.log('✅ Миграция завершена');
       localStorage.removeItem('ston_tokens');
     } catch (err) {
-      console.error(' Ошибка миграции:', err);
+      console.error('❌ Ошибка миграции:', err);
     }
   },
 
   async getTrades() {
     if (!this.currentUser) {
-      console.warn('⚠️ getTrades: нет авторизации');
+      console.error('❌ getTrades: нет авторизации');
       return [];
     }
     try {
-      console.log(' Загрузка транзакций из Firebase...');
+      console.log('📥 Загрузка транзакций...');
       const snapshot = await db.collection('trades')
         .where('userId', '==', this.currentUser.uid)
         .orderBy('createdAt', 'desc')
@@ -95,13 +106,13 @@ const FirebaseClient = {
       throw new Error('Not authenticated');
     }
     try {
-      console.log('📤 Добавление транзакции:', trade);
+      console.log('📤 Добавление транзакции:', trade.name || trade.token);
       const docRef = await db.collection('trades').add({
         ...trade,
         userId: this.currentUser.uid,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      console.log('✅ Транзакция добавлена с ID:', docRef.id);
+      console.log('✅ Транзакция добавлена, ID:', docRef.id);
       return { id: docRef.id, ...trade };
     } catch (err) {
       console.error('❌ addTrade error:', err);
@@ -115,7 +126,7 @@ const FirebaseClient = {
       throw new Error('Not authenticated');
     }
     try {
-      console.log('️ Обновление транзакции', id, ':', trade);
+      console.log('✏️ Обновление транзакции:', id);
       await db.collection('trades').doc(id).set({
         ...trade,
         userId: this.currentUser.uid,
@@ -135,14 +146,11 @@ const FirebaseClient = {
       throw new Error('Not authenticated');
     }
     try {
-      console.log('🗑️ Удаление транзакции с ID:', id);
-      console.log('   Collection: trades, Doc ID:', id);
+      console.log('🗑️ Удаление транзакции:', id);
       await db.collection('trades').doc(id).delete();
       console.log('✅ Транзакция удалена');
     } catch (err) {
       console.error('❌ deleteTrade error:', err);
-      console.error('   ID:', id);
-      console.error('   User:', this.currentUser.uid);
       throw err;
     }
   },
