@@ -656,8 +656,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   els.exportBtn?.addEventListener('click', exportData);
 
+  // === ДОБАВЛЕНА ИНИЦИАЛИЗАЦИЯ FIREBASE ПЕРЕД ЗАГРУЗКОЙ ДАННЫХ ===
   const init = async () => {
     try {
+      // Инициализация Firebase и ожидание авторизации
+      if (typeof FirebaseClient !== 'undefined') {
+        await FirebaseClient.init();
+        await new Promise(resolve => FirebaseClient.onAuthReady(() => resolve()));
+        
+        if (!FirebaseClient.isAuthenticated()) {
+          const isGuest = localStorage.getItem('guest_mode') === 'true';
+          if (!isGuest) {
+            window.location.href = 'auth.html';
+            return;
+          }
+        }
+      }
+
+      // Теперь загружаем данные (DB.getAll() уже пойдёт в Firebase)
       transactions = await DB.getAll();
       initCustomSelects();
       initNameAutocomplete();
