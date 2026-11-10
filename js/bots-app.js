@@ -618,6 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(url);
   };
 
+  // === ИСПРАВЛЕНО: используем результат от DB.add() и DB.update() ===
   els.form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -642,12 +643,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (editingTxId) {
-      await DB.update(txData);
+      const result = await DB.update(txData);
       const idx = transactions.findIndex(t => t.id === editingTxId);
-      if (idx !== -1) transactions[idx] = txData;
+      if (idx !== -1) transactions[idx] = result || txData;
     } else {
-      await DB.add(txData);
-      transactions.push(txData);
+      const result = await DB.add(txData);
+      transactions.push(result || txData);
     }
     
     els.modal.close();
@@ -656,10 +657,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   els.exportBtn?.addEventListener('click', exportData);
 
-  // === ДОБАВЛЕНА ИНИЦИАЛИЗАЦИЯ FIREBASE ПЕРЕД ЗАГРУЗКОЙ ДАННЫХ ===
   const init = async () => {
     try {
-      // Инициализация Firebase и ожидание авторизации
       if (typeof FirebaseClient !== 'undefined') {
         await FirebaseClient.init();
         await new Promise(resolve => FirebaseClient.onAuthReady(() => resolve()));
@@ -673,7 +672,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // Теперь загружаем данные (DB.getAll() уже пойдёт в Firebase)
       transactions = await DB.getAll();
       initCustomSelects();
       initNameAutocomplete();
